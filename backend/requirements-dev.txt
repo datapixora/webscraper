@@ -1,0 +1,64 @@
+# ==================================
+# WEBSCRAPER PLATFORM - Development Dependencies
+# ==================================
+
+# Include production dependencies
+-r requirements.txt
+
+# ==================================
+# TESTING
+# ==================================
+pytest==8.0.0
+pytest-asyncio==0.23.4
+pytest-cov==4.1.0
+pytest-mock==3.12.0
+pytest-xdist==3.5.0  # Parallel test execution
+httpx==0.26.0  # For testing FastAPI
+faker==22.6.0  # Generate fake data for tests
+
+# ==================================
+# CODE QUALITY
+# ==================================
+# Linting
+flake8==7.0.0
+flake8-bugbear==24.1.17
+flake8-docstrings==1.7.0
+pylint==3.0.3
+
+# Formatting
+black==24.1.1
+isort==5.13.2
+
+# Type checking
+mypy==1.8.0
+types-redis==4.6.0.20240106
+types-python-dateutil==2.8.19.20240106
+
+# Security
+bandit==1.7.6
+safety==3.0.1
+
+# ==================================
+# DEVELOPMENT TOOLS
+# ==================================
+ipython==8.21.0
+ipdb==0.13.13
+watchdog==4.0.0
+pre-commit==3.6.0
+
+# ==================================
+# DATABASE TOOLS
+# ==================================
+alembic-utils==0.8.2
+
+# ==================================
+# API DOCUMENTATION
+# ==================================
+# FastAPI already includes Swagger UI
+# But you can add custom doc generators if needed
+
+# ==================================
+# PROFILING & DEBUGGING
+# ==================================
+memory-profiler==0.61.0
+py-spy==0.3.14

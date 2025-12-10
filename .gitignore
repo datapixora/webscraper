@@ -1,0 +1,254 @@
+# ==================================
+# WEBSCRAPER PLATFORM - .gitignore
+# ==================================
+
+# ==================================
+# ENVIRONMENT & SECRETS
+# ==================================
+.env
+.env.local
+.env.*.local
+.env.production
+.env.staging
+*.pem
+*.key
+secrets/
+
+# ==================================
+# PYTHON
+# ==================================
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Distribution / packaging
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Unit test / coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+.hypothesis/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# ==================================
+# NODE.JS / NEXT.JS
+# ==================================
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Next.js
+.next/
+out/
+build/
+dist/
+
+# Production
+/build
+
+# Vercel
+.vercel
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# ==================================
+# DATABASES
+# ==================================
+*.db
+*.sqlite
+*.sqlite3
+*.db-shm
+*.db-wal
+postgres_data/
+pgdata/
+
+# ==================================
+# REDIS
+# ==================================
+dump.rdb
+redis_data/
+
+# ==================================
+# LOGS
+# ==================================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ==================================
+# DOCKER
+# ==================================
+.dockerignore
+
+# ==================================
+# IDEs / EDITORS
+# ==================================
+# VSCode
+.vscode/
+.code-workspace
+
+# PyCharm
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+
+# ==================================
+# OPERATING SYSTEM
+# ==================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+.directory
+.Trash-*
+
+# ==================================
+# SCRAPED DATA & STORAGE
+# ==================================
+storage/
+downloads/
+scraped_data/
+results/
+exports/
+
+# ==================================
+# PLAYWRIGHT
+# ==================================
+playwright/.cache/
+playwright-report/
+test-results/
+
+# ==================================
+# ALEMBIC (Database Migrations)
+# ==================================
+# Keep migrations directory but ignore generated files if needed
+# backend/app/db/migrations/versions/*.pyc
+
+# ==================================
+# TESTING
+# ==================================
+.pytest_cache/
+.coverage
+coverage/
+htmlcov/
+*.cover
+
+# ==================================
+# DOCUMENTATION
+# ==================================
+# Keep docs but ignore generated API docs
+docs/_build/
+docs/site/
+
+# ==================================
+# TEMPORARY FILES
+# ==================================
+tmp/
+temp/
+*.tmp
+*.bak
+*.swp
+.cache/
+
+# ==================================
+# CI/CD
+# ==================================
+.github/secrets/
+
+# ==================================
+# MISCELLANEOUS
+# ==================================
+.sass-cache/
+.parcel-cache/
+*.pid
+*.seed
+*.pid.lock
+.terraform/
+*.tfstate
+*.tfstate.backup
