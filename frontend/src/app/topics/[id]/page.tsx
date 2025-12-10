@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useTopicUrls } from '@/hooks/useTopicUrls';
 import { useTopics } from '@/hooks/useTopics';
-import { TopicUrl } from '@/lib/api-client';
+import { TopicUrl, apiBase } from '@/lib/api-client';
 
 export default function TopicDetailPage() {
   const params = useParams<{ id: string | string[] }>();
@@ -14,8 +14,10 @@ export default function TopicDetailPage() {
   const topic = topicQuery(topicId);
   const { urlsQuery, updateSelectionMutation, scrapeSelectedMutation } = useTopicUrls({ topicId });
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [downloading, setDownloading] = useState(false);
 
   const urls = useMemo(() => urlsQuery.data ?? [], [urlsQuery.data]);
+  const allSelected = urls.length > 0 && selectedIds.size === urls.length;
 
   useEffect(() => {
     // initialize selected IDs from server state
@@ -32,8 +34,42 @@ export default function TopicDetailPage() {
     updateSelectionMutation.mutate({ urlIds: [id], selected: next.has(id) });
   };
 
+  const toggleSelectAll = (checked: boolean) => {
+    const ids = urls.map((u) => u.id);
+    setSelectedIds(checked ? new Set(ids) : new Set());
+    if (ids.length > 0) {
+      updateSelectionMutation.mutate({ urlIds: ids, selected: checked });
+    }
+  };
+
   const triggerScrape = () => {
     scrapeSelectedMutation.mutate({ project_id: undefined });
+  };
+
+  const downloadAllResults = async () => {
+    if (!topicId) return;
+    try {
+      setDownloading(true);
+      const res = await fetch(`${apiBase}/api/v1/topics/${topicId}/results/export`);
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || res.statusText);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `topic_${topicId}_results.zip`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      alert((err as Error).message || 'Download failed');
+    } finally {
+      setDownloading(false);
+    }
   };
 
   return (
@@ -72,13 +108,30 @@ export default function TopicDetailPage() {
             <h3 className="text-lg font-semibold text-white">Discovered URLs</h3>
             <p className="text-sm text-slate-300">Select URLs to create scraping jobs.</p>
           </div>
-          <button
-            onClick={triggerScrape}
-            className="rounded-md border border-emerald-300/50 bg-emerald-500/10 px-3 py-2 text-sm font-semibold text-emerald-100 hover:border-emerald-200 hover:bg-emerald-500/20 disabled:opacity-60"
-            disabled={scrapeSelectedMutation.isPending}
-          >
-            {scrapeSelectedMutation.isPending ? 'Triggering...' : 'Create scraping jobs for selected'}
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="flex items-center gap-2 text-sm text-slate-200">
+              <input
+                type="checkbox"
+                checked={allSelected}
+                onChange={(e) => toggleSelectAll(e.target.checked)}
+              />
+              Select all
+            </label>
+            <button
+              onClick={downloadAllResults}
+              className="rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-slate-100 hover:border-emerald-200 hover:bg-emerald-500/10 disabled:opacity-60"
+              disabled={downloading}
+            >
+              {downloading ? 'Downloading...' : 'Download All Results'}
+            </button>
+            <button
+              onClick={triggerScrape}
+              className="rounded-md border border-emerald-300/50 bg-emerald-500/10 px-3 py-2 text-sm font-semibold text-emerald-100 hover:border-emerald-200 hover:bg-emerald-500/20 disabled:opacity-60"
+              disabled={scrapeSelectedMutation.isPending}
+            >
+              {scrapeSelectedMutation.isPending ? 'Triggering...' : 'Create scraping jobs for selected'}
+            </button>
+          </div>
         </div>
         {urlsQuery.isLoading && <p className="mt-3 text-sm text-slate-300">Loading URLs...</p>}
         {urlsQuery.isError && (

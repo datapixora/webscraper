@@ -1,5 +1,11 @@
+import json
+import zipfile
+from io import BytesIO
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from app.db.session import get_db
 from app.models.topic import TopicStatus
@@ -10,6 +16,9 @@ from app.services.topic_urls import topic_url_service
 from app.services.topics import topic_service
 from app.services.jobs import job_service
 from app.workers.tasks import run_topic_search, run_scrape_job
+from app.models.result import Result
+from app.models.job import Job
+from app.models.topic_url import TopicURL
 
 router = APIRouter()
 
@@ -102,3 +111,40 @@ async def scrape_selected_topic_urls(
         jobs_created += 1
     await db.commit()
     return {"jobs_created": jobs_created}
+
+
+@router.get("/{topic_id}/results/export")
+async def export_topic_results(topic_id: str, db: AsyncSession = Depends(get_db)):
+    topic = await topic_service.get(db, topic_id)
+    if not topic:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Topic not found")
+
+    stmt = (
+        select(Result)
+        .join(Job, Result.job_id == Job.id)
+        .join(TopicURL, TopicURL.url == Job.target_url)
+        .where(TopicURL.topic_id == topic_id)
+    )
+    results = (await db.execute(stmt)).scalars().all()
+
+    memfile = BytesIO()
+    with zipfile.ZipFile(memfile, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for res in results:
+            payload = {
+                "id": res.id,
+                "job_id": res.job_id,
+                "project_id": res.project_id,
+                "structured_data": res.structured_data,
+                "raw_html": res.raw_html,
+                "raw_html_path": res.raw_html_path,
+                "raw_html_checksum": res.raw_html_checksum,
+                "raw_html_size": res.raw_html_size,
+                "raw_html_compressed_size": res.raw_html_compressed_size,
+                "created_at": res.created_at.isoformat() if res.created_at else None,
+                "updated_at": res.updated_at.isoformat() if res.updated_at else None,
+            }
+            zf.writestr(f"result_{res.job_id}.json", json.dumps(payload, ensure_ascii=False, indent=2))
+
+    memfile.seek(0)
+    headers = {"Content-Disposition": f'attachment; filename="topic_{topic_id}_results.zip"'}
+    return StreamingResponse(memfile, media_type="application/zip", headers=headers)
