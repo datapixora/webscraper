@@ -5,7 +5,7 @@ from io import BytesIO
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 
 from app.db.session import get_db
 from app.models.topic import TopicStatus
@@ -119,13 +119,24 @@ async def export_topic_results(topic_id: str, db: AsyncSession = Depends(get_db)
     if not topic:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Topic not found")
 
-    stmt = (
-        select(Result)
-        .join(Job, Result.job_id == Job.id)
-        .join(TopicURL, TopicURL.url == Job.target_url)
-        .where(TopicURL.topic_id == topic_id)
-    )
-    results = (await db.execute(stmt)).scalars().all()
+    # load topic urls and normalize
+    topic_urls = await topic_url_service.list(db, topic_id=topic_id)
+    def _norm(url: str) -> str:
+        return url.strip().rstrip("/").lower()
+
+    normalized_targets = {_norm(tu.url) for tu in topic_urls if tu.url}
+
+    results: list[Result] = []
+    if normalized_targets:
+        jobs_stmt = select(Job.id, Job.target_url).where(
+            func.lower(func.trim(Job.target_url)).in_(normalized_targets)
+        )
+        job_rows = (await db.execute(jobs_stmt)).all()
+        job_ids = [row.id for row in job_rows if _norm(row.target_url) in normalized_targets]
+
+        if job_ids:
+            stmt = select(Result).where(Result.job_id.in_(job_ids))
+            results = (await db.execute(stmt)).scalars().all()
 
     memfile = BytesIO()
     with zipfile.ZipFile(memfile, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
