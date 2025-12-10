@@ -37,7 +37,7 @@
     "sonner": "^1.4.0",
     "zustand": "^4.5.0",
     "js-cookie": "^3.0.5",
-    "json-view-react": "^0.1.5"
+    "json-view-react": "^1.1.1"
   },
   "devDependencies": {
     "@types/node": "20.11.5",

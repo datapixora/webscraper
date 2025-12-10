@@ -1,423 +1,85 @@
-# 🕷️ WebScraper Platform
+# WebScraper Platform
 
-A production-grade, full-stack web scraping platform with a modern admin dashboard, powerful API, and intelligent job scheduling.
+Production-ready scaffolding for a full-stack web scraping platform with a modern admin dashboard, robust API, and scheduled scraping jobs.
 
-## 🎯 Features
+## Features
+- Intelligent scraping: Playwright for JavaScript-heavy sites plus fast HTML parsing
+- Multi-tenant projects with isolation
+- Flexible scheduling: one-time, cron, hourly, daily, weekly
+- Extraction schemas: CSS selectors, XPath, JSONPath
+- Monitoring: job status, success rates, performance metrics
+- Webhooks on completion
+- Proxy rotation and rate limiting
+- Result export: JSON and CSV via API
 
-### Core Capabilities
-- **Intelligent Scraping Engine**: Support for both JavaScript-heavy sites (Playwright) and fast HTML parsing
-- **Multi-Tenant Architecture**: Isolated projects and data for multiple users
-- **Flexible Scheduling**: One-time, hourly, daily, weekly scraping jobs with cron support
-- **Rich Extraction Schemas**: CSS selectors, XPath, JSONPath for structured data extraction
-- **Real-Time Monitoring**: Track job status, success rates, and performance metrics
-- **Webhook Support**: Push notifications on job completion
-- **Proxy Rotation**: Built-in proxy management for rate limiting and IP rotation
-- **Result Export**: JSON, CSV formats with API access
+## Architecture
+- Frontend: Next.js 14 (App Router), React 18, Tailwind CSS
+- Backend: FastAPI API, Celery workers, PostgreSQL, Redis
+- Scraping: Playwright browser automation plus HTML parsers
+- Orchestration: Docker Compose for dev; separate services for API, worker, beat, Flower, Redis, Postgres
 
-### Admin Dashboard
-- 📊 **Dashboard Overview**: KPIs, charts, and real-time statistics
-- 🗂️ **Project Management**: Create, edit, and manage scraping projects
-- ⚙️ **Job Control**: Manual triggers, status monitoring, log inspection
-- 📋 **Results Viewer**: Paginated data tables with JSON viewer and CSV export
-- 🔐 **User Management**: Role-based access control (admin, client, viewer)
-- 🛠️ **System Settings**: Proxy configuration, rate limits, API keys
+## Tech Stack
+- Backend: Python 3.11, FastAPI, SQLAlchemy, Alembic, Celery, Redis, Playwright
+- Frontend: Next.js, TypeScript, Tailwind CSS, TanStack Query, Zustand, Recharts
+- DevOps: Docker, Docker Compose, Flower for Celery monitoring, structured logging
 
-### API
-- **RESTful API**: Comprehensive endpoints for all operations
-- **JWT Authentication**: Secure token-based auth
-- **Rate Limiting**: Configurable per-user limits
-- **Pagination**: Efficient data retrieval
-- **OpenAPI/Swagger**: Auto-generated interactive documentation
+## Status
+This repository currently contains configuration scaffolding only. Application code for `backend/app` and `frontend/src` is not yet included. Add your API, models, workers, and frontend pages/components to make the stack runnable.
 
----
-
-## 🏗️ Architecture
-
-```
-┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐
-│   Next.js UI    │─────▶│  FastAPI API    │─────▶│   PostgreSQL    │
-│   (Dashboard)   │      │   (Backend)     │      │   (Database)    │
-└─────────────────┘      └─────────────────┘      └─────────────────┘
-                                │
-                                ▼
-                         ┌─────────────────┐      ┌─────────────────┐
-                         │  Celery Worker  │◀─────│      Redis      │
-                         │  (Scraper Jobs) │      │  (Queue/Cache)  │
-                         └─────────────────┘      └─────────────────┘
-                                │
-                                ▼
-                         ┌─────────────────┐
-                         │   Playwright    │
-                         │   (Browser)     │
-                         └─────────────────┘
-```
-
----
-
-## 🛠️ Tech Stack
-
-### Backend
-- **Python 3.11+** with **FastAPI**
-- **PostgreSQL** for data persistence
-- **Redis** for caching and task queue
-- **Celery** for background job processing
-- **Playwright** for browser automation
-- **SQLAlchemy** + **Alembic** for ORM and migrations
-
-### Frontend
-- **Next.js 14** (App Router) with **React 18**
-- **TypeScript** for type safety
-- **Tailwind CSS** for styling
-- **TanStack Query** for data fetching
-- **Zustand** for state management
-- **Recharts** for data visualization
-
-### DevOps
-- **Docker** + **Docker Compose** for containerization
-- **Flower** for Celery monitoring
-- **Structured logging** (JSON) with OpenTelemetry-ready format
-
----
-
-## 🚀 Quick Start
-
-### Prerequisites
-- **Docker** and **Docker Compose** installed
-- **Make** (optional, for convenient commands)
-- **Git**
-
-### Installation
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/yourusername/webscraper.git
-   cd webscraper
-   ```
-
-2. **Create environment file**
-   ```bash
-   make create-env
-   # OR
-   cp .env.example .env
-   ```
-
-3. **Update environment variables**
-   Edit `.env` and set required values:
-   - `SECRET_KEY`: Generate with `openssl rand -hex 32`
-   - `POSTGRES_PASSWORD`: Set a strong password
-   - Update `CORS_ORIGINS` if needed
-
-4. **Initialize and start the project**
-   ```bash
-   make init
-   ```
-
-   This will:
-   - Build Docker images
-   - Start all services
-   - Run database migrations
-   - Seed initial data
-
-5. **Access the services**
-   - **Frontend Dashboard**: http://localhost:3000
-   - **Backend API**: http://localhost:8000
-   - **API Documentation**: http://localhost:8000/docs
-   - **Flower (Celery Monitor)**: http://localhost:5555
-
----
-
-## 📖 Usage
-
-### Using Make Commands
-
-```bash
-# Development
-make dev              # Start development environment
-make logs             # View all logs
-make logs-backend     # View backend logs only
-make logs-worker      # View worker logs only
-
-# Database
-make migrate          # Run migrations
-make migrate-create MESSAGE="your migration"  # Create new migration
-make db-reset         # Reset database (WARNING: destructive)
-make seed             # Seed sample data
-
-# Testing
-make test             # Run all tests
-make test-backend     # Run backend tests
-make test-backend-cov # Run backend tests with coverage
-
-# Code Quality
-make format           # Format code (Python & TypeScript)
-make lint             # Lint code
-make lint-fix         # Fix linting issues
-
-# Shell Access
-make backend-shell    # Access backend container
-make db-shell         # Access PostgreSQL
-make redis-shell      # Access Redis CLI
-
-# Utilities
-make playwright-install  # Install Playwright browsers
-make backup-db        # Backup database
-make api-docs         # Open API documentation
-```
-
-### Manual Docker Commands
-
-```bash
-# Start services
-docker-compose up -d
-
-# View logs
-docker-compose logs -f
-
-# Stop services
-docker-compose down
-
-# Rebuild images
-docker-compose build
-
-# Run migrations
-docker-compose exec backend alembic upgrade head
-```
-
----
-
-## 📁 Project Structure
-
+## Project Structure
 ```
 webscraper/
-├── backend/                 # FastAPI backend
-│   ├── app/
-│   │   ├── api/            # API routes
-│   │   ├── core/           # Core configuration
-│   │   ├── models/         # Database models
-│   │   ├── schemas/        # Pydantic schemas
-│   │   ├── services/       # Business logic
-│   │   ├── repositories/   # Data access layer
-│   │   ├── scraper/        # Scraping engine
-│   │   ├── workers/        # Celery tasks
-│   │   └── db/            # Database & migrations
-│   ├── tests/             # Test suite
-│   └── requirements.txt   # Python dependencies
-│
-├── frontend/               # Next.js frontend
-│   ├── src/
-│   │   ├── app/           # App Router pages
-│   │   ├── components/    # React components
-│   │   ├── lib/           # Utilities
-│   │   ├── hooks/         # Custom hooks
-│   │   ├── types/         # TypeScript types
-│   │   └── contexts/      # React contexts
-│   └── package.json       # Node dependencies
-│
-├── docs/                   # Documentation
-├── scripts/                # Utility scripts
-├── docker-compose.yml      # Development orchestration
-└── Makefile               # Convenience commands
+├─ backend/           # FastAPI backend (code not yet present)
+├─ frontend/          # Next.js frontend (code not yet present)
+├─ docker-compose.yml # Dev orchestration
+├─ Makefile           # Helper commands
+└─ .env.example       # Environment template
 ```
 
----
+## Getting Started
+Prerequisites: Docker and Docker Compose; Make (optional).
 
-## 🔐 Security Considerations
-
-### Best Practices Implemented
-- ✅ **JWT-based authentication** with secure token handling
-- ✅ **Password hashing** using bcrypt
-- ✅ **Multi-tenant data isolation** at database level
-- ✅ **CORS configuration** for API security
-- ✅ **Rate limiting** to prevent abuse
-- ✅ **Environment-based secrets** (never hardcoded)
-- ✅ **robots.txt compliance** (configurable per project)
-- ✅ **Request throttling** to avoid DoS on target sites
-
-### Configuration
-- Always use strong, unique `SECRET_KEY` in production
-- Enable HTTPS in production environments
-- Rotate API keys regularly
-- Configure proxy settings to avoid IP bans
-- Review and respect target website ToS and rate limits
-
----
-
-## 🧪 Testing
-
-### Backend Tests
+1) Copy environment template  
 ```bash
-# Run all backend tests
-make test-backend
-
-# Run with coverage report
-make test-backend-cov
-
-# Run specific test file
-docker-compose exec backend pytest tests/unit/test_scraper.py -v
+make create-env   # or: cp .env.example .env
 ```
-
-### Frontend Tests
+2) Update `.env` with secrets (e.g., `SECRET_KEY`, database password) and CORS origins.  
+3) Build and start  
 ```bash
-# Run all frontend tests
-make test-frontend
-
-# Run in watch mode
-docker-compose exec frontend npm run test:watch
-
-# Run E2E tests
-make test-frontend-e2e
+make init
+# or manually:
+docker-compose up -d
 ```
+4) When code is added and services are running:  
+- Frontend: http://localhost:3000  
+- Backend: http://localhost:8000  
+- API Docs (Swagger): http://localhost:8000/docs  
+- Flower: http://localhost:5555
 
----
+## Useful Commands (Makefile)
+- `make dev` — start all services with logs
+- `make up` / `make down` — start/stop in background
+- `make logs` / `make logs-backend` / `make logs-worker` — follow logs
+- `make migrate` / `make migrate-create MESSAGE="desc"` — Alembic migrations
+- `make seed` — seed sample data (requires your seed script)
+- `make test` / `make test-backend` / `make test-frontend` — run tests
+- `make format` / `make lint` — code quality helpers
 
-## 📊 API Documentation
+## Environment
+See `.env.example` for full variables (DB/Redis URLs, auth, scraping, proxies, Celery, logging, feature flags). In production, set strong secrets, enable HTTPS, and tune rate limits/proxy settings.
 
-Once the backend is running, access interactive API documentation:
+## Deployment Notes
+- Build production images: `make build-prod`
+- Start production stack: `make up-prod` (expects a `docker-compose.prod.yml` you provide)
+- Run migrations before releasing: `alembic upgrade head`
 
-- **Swagger UI**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
+## Contributing
+1. Fork and create a feature branch.  
+2. Add backend code under `backend/app/...` and frontend code under `frontend/src/...`.  
+3. Run `make format` and `make lint`.  
+4. Open a PR.
 
-### Key Endpoints
-
-#### Authentication
-- `POST /api/v1/auth/login` - Login and get JWT token
-- `POST /api/v1/auth/register` - Register new user
-
-#### Projects
-- `GET /api/v1/projects` - List all projects
-- `POST /api/v1/projects` - Create new project
-- `GET /api/v1/projects/{id}` - Get project details
-- `PATCH /api/v1/projects/{id}` - Update project
-- `DELETE /api/v1/projects/{id}` - Delete project
-
-#### Jobs
-- `GET /api/v1/jobs` - List jobs (with filters)
-- `POST /api/v1/projects/{id}/jobs` - Trigger manual job
-- `GET /api/v1/jobs/{id}` - Get job details
-
-#### Results
-- `GET /api/v1/jobs/{id}/results` - Get job results
-- `GET /api/v1/projects/{id}/results` - Get all project results
-
----
-
-## 🔧 Configuration
-
-### Environment Variables
-
-Key environment variables (see `.env.example` for full list):
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `DATABASE_URL` | PostgreSQL connection string | `postgresql://...` |
-| `REDIS_URL` | Redis connection string | `redis://localhost:6379/0` |
-| `SECRET_KEY` | JWT secret key | **Must set in production** |
-| `CORS_ORIGINS` | Allowed CORS origins | `http://localhost:3000` |
-| `PLAYWRIGHT_BROWSER` | Browser type | `chromium` |
-| `MAX_CONCURRENT_JOBS` | Max parallel scraping jobs | `5` |
-| `DEFAULT_REQUEST_DELAY` | Delay between requests (ms) | `1000` |
-| `PROXY_ENABLED` | Enable proxy rotation | `false` |
-
----
-
-## 📈 Monitoring
-
-### Celery Monitoring with Flower
-Access Flower at http://localhost:5555 to monitor:
-- Active workers
-- Task success/failure rates
-- Queue length
-- Task runtime statistics
-
-### Logs
-Structured JSON logs are written to `./logs/app.log` and stdout.
-
-```bash
-# View real-time logs
-make logs
-
-# Filter backend logs
-make logs-backend
-
-# Filter worker logs
-make logs-worker
-```
-
----
-
-## 🚀 Deployment
-
-### Production Checklist
-
-1. **Update environment variables**
-   - Set strong `SECRET_KEY`
-   - Use production database credentials
-   - Configure proper `CORS_ORIGINS`
-   - Enable HTTPS
-
-2. **Build production images**
-   ```bash
-   make build-prod
-   ```
-
-3. **Run database migrations**
-   ```bash
-   docker-compose -f docker-compose.prod.yml exec backend alembic upgrade head
-   ```
-
-4. **Start production services**
-   ```bash
-   make up-prod
-   ```
-
-### Recommended Infrastructure
-- **Containerization**: Deploy with Kubernetes or managed container services (AWS ECS, Google Cloud Run)
-- **Database**: Managed PostgreSQL (AWS RDS, Google Cloud SQL, Azure Database)
-- **Cache**: Managed Redis (AWS ElastiCache, Redis Cloud)
-- **CDN**: CloudFlare, AWS CloudFront for static assets
-- **Monitoring**: Sentry for error tracking, Datadog/New Relic for APM
-
----
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-### Code Style
-- Backend: Follow PEP 8, use `black` and `isort`
-- Frontend: Use Prettier with default settings
-- Run `make format` and `make lint` before committing
-
----
-
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
----
-
-## 🙏 Acknowledgments
-
-- FastAPI for the excellent web framework
-- Playwright for reliable browser automation
-- Next.js for the modern React framework
-- The open-source community
-
----
-
-## 📞 Support
-
-- **Issues**: https://github.com/yourusername/webscraper/issues
-- **Discussions**: https://github.com/yourusername/webscraper/discussions
-- **Email**: support@webscraper.com
-
----
-
-**Built with ❤️ for the web scraping community**
-#   w e b s c r a p e r  
- #   w e b s c r a p e r  
- 
+## Support
+- Issues: https://github.com/yourusername/webscraper/issues
+- Discussions: https://github.com/yourusername/webscraper/discussions
+- Email: support@webscraper.com

@@ -2,15 +2,17 @@
   "compilerOptions": {
     /* Language and Environment */
     "target": "ES2020",
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
     "jsx": "preserve",
-
     /* Modules */
     "module": "esnext",
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "allowImportingTsExtensions": false,
-
     /* Type Checking */
     "strict": true,
     "noUnusedLocals": true,
@@ -29,41 +31,51 @@
     "strictPropertyInitialization": true,
     "noImplicitThis": true,
     "alwaysStrict": true,
-
     /* Emit */
     "noEmit": true,
     "incremental": true,
     "sourceMap": true,
     "removeComments": false,
-
     /* Interop Constraints */
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
     "isolatedModules": true,
-
     /* Completeness */
     "skipLibCheck": true,
     "skipDefaultLibCheck": true,
-
     /* Path Mapping */
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"],
-      "@/components/*": ["./src/components/*"],
-      "@/lib/*": ["./src/lib/*"],
-      "@/hooks/*": ["./src/hooks/*"],
-      "@/types/*": ["./src/types/*"],
-      "@/contexts/*": ["./src/contexts/*"],
-      "@/app/*": ["./src/app/*"]
+      "@/*": [
+        "./src/*"
+      ],
+      "@/components/*": [
+        "./src/components/*"
+      ],
+      "@/lib/*": [
+        "./src/lib/*"
+      ],
+      "@/hooks/*": [
+        "./src/hooks/*"
+      ],
+      "@/types/*": [
+        "./src/types/*"
+      ],
+      "@/contexts/*": [
+        "./src/contexts/*"
+      ],
+      "@/app/*": [
+        "./src/app/*"
+      ]
     },
-
     /* Next.js specific */
     "plugins": [
       {
         "name": "next"
       }
-    ]
+    ],
+    "allowJs": true
   },
   "include": [
     "next-env.d.ts",

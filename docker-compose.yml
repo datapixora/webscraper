@@ -46,6 +46,8 @@ services:
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-webscraper}:${POSTGRES_PASSWORD:-webscraper_dev_password}@postgres:5432/${POSTGRES_DB:-webscraper_db}
       - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-production}
       - ENVIRONMENT=${ENVIRONMENT:-development}
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://localhost:8000}
@@ -72,6 +74,8 @@ services:
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-webscraper}:${POSTGRES_PASSWORD:-webscraper_dev_password}@postgres:5432/${POSTGRES_DB:-webscraper_db}
       - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-production}
       - ENVIRONMENT=${ENVIRONMENT:-development}
     volumes:
@@ -94,6 +98,8 @@ services:
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-webscraper}:${POSTGRES_PASSWORD:-webscraper_dev_password}@postgres:5432/${POSTGRES_DB:-webscraper_db}
       - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-production}
       - ENVIRONMENT=${ENVIRONMENT:-development}
     volumes:

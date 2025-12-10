@@ -80,8 +80,8 @@ tenacity==8.2.3  # Retry logic
 cachetools==5.3.2  # Caching utilities
 python-slugify==8.0.4
 pyjwt==2.8.0
+boto3==1.35.63
 
 # ==================================
 # CORS & MIDDLEWARE
 # ==================================
-python-cors==1.0.0
