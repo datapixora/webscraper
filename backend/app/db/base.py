@@ -13,5 +13,7 @@ from app.models.job import Job  # noqa: E402
 from app.models.result import Result  # noqa: E402
 from app.models.topic_campaign import TopicCampaign  # noqa: E402
 from app.models.crawled_page import CrawledPage  # noqa: E402
+from app.models.topic import Topic  # noqa: E402
+from app.models.topic_url import TopicURL  # noqa: E402
 
-__all__ = ["Base", "Project", "Job", "Result", "TopicCampaign", "CrawledPage"]
+__all__ = ["Base", "Project", "Job", "Result", "TopicCampaign", "CrawledPage", "Topic", "TopicURL"]

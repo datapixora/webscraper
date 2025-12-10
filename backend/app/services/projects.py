@@ -6,6 +6,18 @@ from app.schemas.project import ProjectCreate, ProjectUpdate
 
 
 class ProjectService:
+    async def ensure_default_topic_project(self, db: AsyncSession, topic) -> Project:
+        """
+        Ensure a default project exists for topic-derived scrapes.
+        """
+        name = f"Topic: {topic.name}"
+        existing = await db.execute(select(Project).where(Project.name == name))
+        proj = existing.scalars().first()
+        if proj:
+            return proj
+        payload = ProjectCreate(name=name, description=f"Auto-created for topic {topic.name}", extraction_schema=None)
+        return await self.create(db, payload)
+
     async def create(self, db: AsyncSession, payload: ProjectCreate) -> Project:
         project = Project(
             name=payload.name,

@@ -8,13 +8,18 @@ from app.db.session import AsyncSessionLocal
 from app.models.crawled_page import PageStatus
 from app.models.job import Job, JobStatus
 from app.models.project import Project
+from app.models.topic import Topic, TopicStatus
 from app.models.topic_campaign import CampaignStatus, TopicCampaign
+from app.models.topic_url import TopicURL
 from app.schemas.result import ResultCreate
 from app.scraper import crawl_page_for_campaign
 from app.services.jobs import job_service
 from app.services.results import result_service
 from app.services.campaigns import campaign_service
 from app.services.crawled_pages import crawled_page_service
+from app.services.search_provider import search_provider, SearchResult
+from app.services.topics import topic_service
+from app.services.topic_urls import topic_url_service
 from app.services.storage import storage_service
 from app.scraper import scrape_url
 from app.workers.celery_app import celery_app
@@ -175,5 +180,36 @@ def crawl_url(campaign_id: str, url: str, depth: int = 0) -> dict[str, Any]:
                 await campaign_service.update_status(db, campaign, CampaignStatus.COMPLETED)
 
             return {"status": status.value, "url": url_clean}
+
+    return asyncio.run(_run())
+
+
+@celery_app.task(name="topics.run_topic_search")
+def run_topic_search(topic_id: str) -> dict[str, Any]:
+    async def _run() -> dict[str, Any]:
+        async with AsyncSessionLocal() as db:
+            topic = await db.get(Topic, topic_id)
+            if not topic:
+                return {"error": "topic not found"}
+            await topic_service.update_status(db, topic, TopicStatus.SEARCHING)
+
+            try:
+                results: list[SearchResult] = await search_provider.search_web(topic.query, topic.max_results)
+                rows = [
+                    {
+                        "url": r.url,
+                        "title": r.title,
+                        "snippet": r.snippet,
+                        "rank": r.rank,
+                    }
+                    for r in results
+                ]
+                await topic_url_service.bulk_create(db, topic_id=topic.id, rows=rows)
+                await topic_service.update_status(db, topic, TopicStatus.COMPLETED)
+                return {"status": "ok", "count": len(rows)}
+            except Exception as exc:  # noqa: BLE001
+                await topic_service.update_status(db, topic, TopicStatus.FAILED)
+                logger.exception("Topic search failed", extra={"topic_id": topic.id})
+                return {"status": "error", "error": str(exc)}
 
     return asyncio.run(_run())
