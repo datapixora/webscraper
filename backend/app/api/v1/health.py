@@ -1,15 +1,19 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 
 from app import __version__
 from app.core.config import settings
+from app.db.session import AsyncSessionLocal
 
 
 class HealthResponse(BaseModel):
-    status: str = "ok"
+    status: str
     service: str = settings.project_name
     version: str = __version__
     environment: str = settings.environment
+    db: bool
 
 
 router = APIRouter()
@@ -18,6 +22,14 @@ router = APIRouter()
 @router.get("/", response_model=HealthResponse, summary="Health check")
 async def read_health() -> HealthResponse:
     """
-    Lightweight health endpoint for probes.
+    Lightweight health endpoint for probes, including DB reachability.
     """
-    return HealthResponse()
+    db_ok = True
+    try:
+        async with AsyncSessionLocal() as session:
+            await session.execute(text("SELECT 1"))
+    except SQLAlchemyError:
+        db_ok = False
+
+    status = "ok" if db_ok else "degraded"
+    return HealthResponse(status=status, db=db_ok)
