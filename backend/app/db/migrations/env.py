@@ -12,7 +12,6 @@ from pathlib import Path
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
-from sqlalchemy.engine.url import make_url
 
 from app.db.base import Base
 
@@ -34,15 +33,14 @@ def _sync_database_url() -> str:
     if not raw_url:
         raise RuntimeError("DATABASE_URL is not set for Alembic migrations.")
 
-    url = make_url(raw_url)
-
-    # Prefer psycopg2 (sync) for migrations even if the runtime uses asyncpg.
-    if url.drivername.startswith("postgresql+asyncpg"):
-        url = url.set(drivername="postgresql+psycopg2")
-    elif url.drivername == "postgresql":
-        url = url.set(drivername="postgresql+psycopg2")
-
-    return str(url)
+    # Preserve credentials verbatim; only swap the driver to sync.
+    if raw_url.startswith("postgresql+asyncpg://"):
+        return raw_url.replace("postgresql+asyncpg://", "postgresql+psycopg2://", 1)
+    if raw_url.startswith("postgresql://"):
+        return raw_url.replace("postgresql://", "postgresql+psycopg2://", 1)
+    if raw_url.startswith("postgres://"):
+        return raw_url.replace("postgres://", "postgresql+psycopg2://", 1)
+    return raw_url
 
 
 def _configure_sqlalchemy_url() -> None:
