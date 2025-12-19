@@ -5,14 +5,21 @@ Alembic configuration for the project.
 - Forces a synchronous driver for migrations (psycopg2) to keep Render pre-deploy stable.
 """
 
-from logging.config import fileConfig
 import os
+import sys
+from logging.config import fileConfig
+from pathlib import Path
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 from sqlalchemy.engine.url import make_url
 
 from app.db.base import Base
+
+# Ensure backend/ is on sys.path when Alembic is invoked from Render pre-deploy.
+BACKEND_ROOT = Path(__file__).resolve().parents[2]
+if str(BACKEND_ROOT) not in sys.path:
+    sys.path.insert(0, str(BACKEND_ROOT))
 
 config = context.config
 
