@@ -40,11 +40,11 @@ See `.env.example` for all variables. Key ones:
 - `SECRET_KEY`, `CORS_ORIGINS`, scraping timeouts, proxy settings
 
 ## Deployment to Render (API only)
-- Blueprint-driven: `render.yaml` defines a single Web Service (API) built from `backend/`, with a pre-deploy migration `cd backend && alembic upgrade head`.
+- Blueprint-driven: `render.yaml` creates one Web Service (API) and one Postgres resource (`webscraper-db-prod`). `DATABASE_URL` is auto-injected from the database via `fromDatabase`, and `SECRET_KEY` is auto-generated.
 - Deploy flow:
   1) Render → New → Blueprint Instance → select this repo.
-  2) Set `DATABASE_URL` to the **Internal Database URL** of `webscraper-db-prod` (secret, sync off). Set `SECRET_KEY` and `CORS_ORIGINS` as needed; keep `ENVIRONMENT=production`.
-  3) Click Deploy. Pre-deploy runs Alembic; deploy fails if migrations fail.
+  2) Confirm env vars: `DATABASE_URL` already wired to the database; `SECRET_KEY` generated; adjust `CORS_ORIGINS` if needed; keep `ENVIRONMENT=production`.
+  3) Click Deploy. Pre-deploy runs `cd backend && alembic upgrade head`; deploy fails if migrations fail.
   4) Verify `https://<service-url>/health` (expects `{"status":"ok","db":true}`) and review logs.
 - Start command (blueprint): `cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT`
 - Manual migrations fallback: `cd backend && alembic upgrade head`

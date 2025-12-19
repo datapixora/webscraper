@@ -1,3 +1,9 @@
+databases:
+  - name: webscraper-db-prod
+    plan: basic-256mb
+    region: oregon
+    databaseName: webscraper_db_prod
+
 services:
   - type: web
     name: webscraper-api
@@ -14,9 +20,11 @@ services:
     autoDeploy: true
     envVars:
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: webscraper-db-prod
+          property: connectionString
       - key: SECRET_KEY
-        sync: false
+        generateValue: true
       - key: ENVIRONMENT
         value: production
       - key: CORS_ORIGINS
