@@ -1,5 +1,5 @@
 # TODO
 
-- Add automated Render provisioning (render.yaml or Terraform) once service settings are finalized.
-- Set up per-environment secrets management (Render env groups) and rotate `SECRET_KEY`.
-- Add end-to-end test that hits `/api/v1/health` and a simple DB query via Playwright/API.
+- Add worker/beat + Redis to Render via blueprint once ready for background jobs.
+- Wire Render Environment Groups for shared secrets and rotate `SECRET_KEY`.
+- Add E2E test that hits `/health` and verifies DB via Playwright/API.

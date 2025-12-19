@@ -1,17 +1,17 @@
 # WebScraper Platform
 
-Full-stack web scraping platform with FastAPI, Celery workers, PostgreSQL, Redis, Playwright scraping, and a Next.js 14 dashboard.
+FastAPI backend with Celery workers, PostgreSQL, Redis, Playwright-powered scraping, and a Next.js 14 dashboard.
 
 ## Features
-- Topic campaigns with auto-crawl, deduped link following, and page storage
-- CSV/JSON export for results
+- Topic campaigns with auto-crawl and deduped link following
+- CSV/JSON exports for results
 - Worker and beat processes for background jobs
-- Health and monitoring endpoints
+- Health endpoints and DB connectivity checks
 
 ## Architecture
 - Frontend: Next.js 14 (App Router)
-- Backend: FastAPI + SQLAlchemy + Alembic, Celery workers/beat
-- Data stores: PostgreSQL, Redis
+- Backend: FastAPI + SQLAlchemy + Alembic; Celery worker/beat
+- Data: PostgreSQL, Redis
 - Dev orchestration: Docker Compose (Postgres, Redis, backend, worker, beat, frontend, Flower)
 
 ## Project Structure
@@ -21,6 +21,7 @@ frontend/  # Next.js dashboard
 docker-compose.yml
 Makefile
 .env.example
+render.yaml
 ```
 
 ## Getting Started (local)
@@ -38,22 +39,16 @@ See `.env.example` for all variables. Key ones:
 - `REDIS_URL`, `CELERY_BROKER_URL`, `CELERY_RESULT_BACKEND`
 - `SECRET_KEY`, `CORS_ORIGINS`, scraping timeouts, proxy settings
 
-## Deployment Notes (Render)
-- DB-using services: `backend` (API), `worker`, `beat`. They must share the same `DATABASE_URL`.
-- Render env vars (Dashboard → Service → Environment):
-  - `DATABASE_URL` = Internal Database URL for **webscraper-db-prod**.
-  - `REDIS_URL` (and optionally `CELERY_BROKER_URL` / `CELERY_RESULT_BACKEND`) = your Redis URL.
-  - Keep `SECRET_KEY`, `ENVIRONMENT`, `CORS_ORIGINS` set per environment.
-- Automatic migrations: add a Pre-Deploy Command on the API service:  
-  `cd backend && python -m scripts.migrate`  
-  Deploy will fail (non-zero) if migrations fail.
-- Manual migrations: `cd backend && python -m scripts.migrate`
+## Deployment to Render (API only)
+- Blueprint-driven: `render.yaml` defines a single Web Service (API) built from `backend/`, with a pre-deploy migration `cd backend && alembic upgrade head`.
+- Deploy flow:
+  1) Render → New → Blueprint Instance → select this repo.
+  2) Set `DATABASE_URL` to the **Internal Database URL** of `webscraper-db-prod` (secret, sync off). Set `SECRET_KEY` and `CORS_ORIGINS` as needed; keep `ENVIRONMENT=production`.
+  3) Click Deploy. Pre-deploy runs Alembic; deploy fails if migrations fail.
+  4) Verify `https://<service-url>/health` (expects `{"status":"ok","db":true}`) and review logs.
+- Start command (blueprint): `cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+- Manual migrations fallback: `cd backend && alembic upgrade head`
 - DB connectivity check: `cd backend && python -m scripts.db_ping`
-- Start commands:
-  - API: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-  - Worker: `celery -A app.workers.celery_app worker --loglevel=info`
-  - Beat: `celery -A app.workers.celery_app beat --loglevel=info`
-- Health: `GET /api/v1/health` returns service info plus `db` reachability.
 
 ## Useful Make targets
 - `make dev` — start all services with logs

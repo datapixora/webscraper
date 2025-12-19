@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: webscraper-api
+    env: python
+    plan: starter
+    buildCommand: |
+      cd backend
+      pip install -r requirements.txt
+    startCommand: |
+      cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    preDeployCommand: |
+      cd backend && alembic upgrade head
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: ENVIRONMENT
+        value: production
+      - key: CORS_ORIGINS
+        value: https://your-frontend.example
+      - key: PYTHON_VERSION
+        value: 3.11

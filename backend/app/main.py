@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app import __version__
 from app.api.router import api_router
+from app.api.v1.health import check_db
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -47,3 +48,13 @@ async def on_shutdown() -> None:
 @app.get("/", tags=["root"])
 async def root() -> dict[str, str]:
     return {"message": f"{settings.project_name} API", "version": __version__}
+
+
+@app.get("/health", tags=["health"])
+async def health() -> dict[str, str | bool]:
+    """
+    Render health probe: includes DB connectivity flag.
+    """
+    db_ok = await check_db()
+    status = "ok" if db_ok else "degraded"
+    return {"status": status, "db": db_ok}
