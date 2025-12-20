@@ -88,10 +88,14 @@ const nextConfig = {
 
   /* Rewrites (for API proxying if needed) */
   async rewrites() {
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    if (!apiBase) {
+      throw new Error('NEXT_PUBLIC_API_URL is required for rewrites; set it in .env or .env.local');
+    }
     return [
       {
         source: '/api/:path*',
-        destination: `${process.env.NEXT_PUBLIC_API_URL}/api/:path*`,
+        destination: `${apiBase}/api/:path*`,
       },
     ];
   },

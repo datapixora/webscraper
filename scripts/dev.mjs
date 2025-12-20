@@ -11,6 +11,7 @@ const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, "..");
 const envPath = path.join(rootDir, ".env");
 const envExamplePath = path.join(rootDir, ".env.example");
+const frontendEnvPath = path.join(rootDir, "frontend", ".env.local");
 
 const dockerCmd = "docker";
 const npmCmd = process.platform === "win32" ? "npm.cmd" : "npm";
@@ -34,6 +35,14 @@ function ensureEnvFile() {
 
   fs.copyFileSync(envExamplePath, envPath);
   log("Created .env from .env.example");
+}
+
+function ensureFrontendEnv(apiUrl) {
+  if (fs.existsSync(frontendEnvPath)) {
+    return;
+  }
+  fs.writeFileSync(frontendEnvPath, `NEXT_PUBLIC_API_URL=${apiUrl}\n`, { encoding: "utf-8" });
+  log("Created frontend/.env.local with NEXT_PUBLIC_API_URL");
 }
 
 function run(cmd, args, options = {}) {
@@ -104,6 +113,8 @@ async function startFrontend() {
 
   const frontendDir = path.join(rootDir, "frontend");
   const args = ["run", "dev", "--", "--hostname", "0.0.0.0", "--port", frontendPort];
+
+  ensureFrontendEnv(apiUrl);
 
   log(`Starting frontend on http://localhost:${frontendPort} (API ${apiUrl})...`);
   log(`(manual fallback) cd frontend && ${npmCmd} run dev -- --hostname 0.0.0.0 --port ${frontendPort}`);
