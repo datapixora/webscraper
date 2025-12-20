@@ -16,6 +16,8 @@ class TopicService:
             query=payload.query,
             search_engine=payload.search_engine,
             max_results=payload.max_results,
+            category=payload.category,
+            directory_path=payload.directory_path,
             status=TopicStatus.PENDING,
         )
         db.add(topic)
@@ -35,6 +37,10 @@ class TopicService:
         await db.commit()
         await db.refresh(topic)
         return topic
+
+    async def delete(self, db: AsyncSession, topic: Topic) -> None:
+        await db.delete(topic)
+        await db.commit()
 
 
 topic_service = TopicService()

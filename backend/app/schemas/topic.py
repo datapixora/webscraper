@@ -13,6 +13,8 @@ class TopicCreate(BaseModel):
     query: str = Field(..., max_length=512)
     search_engine: str = Field(default="mock", max_length=50)
     max_results: int = Field(default=20, ge=1, le=100)
+    category: Optional[str] = Field(default=None, max_length=255)
+    directory_path: Optional[str] = Field(default=None, max_length=255)
 
 
 class TopicRead(Identified):
@@ -20,6 +22,8 @@ class TopicRead(Identified):
     query: str
     search_engine: str
     max_results: int
+    category: Optional[str] = None
+    directory_path: Optional[str] = None
     status: TopicStatus
 
 

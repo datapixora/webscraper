@@ -16,6 +16,7 @@ from app.services.topic_urls import topic_url_service
 from app.services.topics import topic_service
 from app.services.jobs import job_service
 from app.workers.tasks import run_topic_search, run_scrape_job
+from app.services.url_validator import url_validator
 from app.models.result import Result
 from app.models.job import Job
 from app.models.topic_url import TopicURL
@@ -42,6 +43,15 @@ async def get_topic(topic_id: str, db: AsyncSession = Depends(get_db)) -> TopicR
     if not topic:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Topic not found")
     return TopicRead.model_validate(topic)
+
+
+@router.delete("/{topic_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_topic(topic_id: str, db: AsyncSession = Depends(get_db)) -> None:
+    topic = await topic_service.get(db, topic_id)
+    if not topic:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Topic not found")
+    await topic_service.delete(db, topic)
+    return None
 
 
 @router.get("/{topic_id}/urls", response_model=list[TopicURLRead])
@@ -81,24 +91,47 @@ async def scrape_selected_topic_urls(
     db: AsyncSession = Depends(get_db),
     body: dict | None = None,
 ):
+    """
+    Create scraping jobs for selected topic URLs.
+
+    Requires a project_id in the request body to link jobs to a project.
+    Jobs will also be linked to this topic for traceability.
+    """
     topic = await topic_service.get(db, topic_id)
     if not topic:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Topic not found")
 
+    # Project ID is required so rules can be applied
     project_id = (body or {}).get("project_id")
-    project = None
-    if project_id:
-        project = await project_service.get(db, project_id)
-        if not project:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
-    else:
-        project = await project_service.ensure_default_topic_project(db, topic)
+    if not project_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="project_id is required")
+    project = await project_service.get(db, project_id)
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+
+    # Default to allowing duplicates for manual sends; caller can disable by sending false
+    allow_duplicates = (body or {}).get("allow_duplicates", True)
 
     urls = await topic_url_service.list(db, topic_id, selected_for_scraping=True, scraped=False)
     jobs_created = 0
+    rejected: list[dict[str, str]] = []
+
+    accepted_by_quota, rejected_pairs = await url_validator.enforce_quota(
+        db, project, [turl.url for turl in urls]
+    )
+    for url, reason in rejected_pairs:
+        rejected.append({"url": url, "reason": reason})
+
     for turl in urls:
+        if turl.url not in accepted_by_quota:
+            continue
+        check = await url_validator.validate_url(db, project, turl.url, skip_dedup=allow_duplicates)
+        if not check.allowed:
+            rejected.append({"url": turl.url, "reason": check.reason or "not allowed"})
+            continue
         payload = JobCreate(
             project_id=project.id,
+            topic_id=topic_id,  # Link job to topic
             name=f"Topic scrape: {turl.url}",
             target_url=turl.url,
             scheduled_at=None,
@@ -110,7 +143,7 @@ async def scrape_selected_topic_urls(
         db.add(turl)
         jobs_created += 1
     await db.commit()
-    return {"jobs_created": jobs_created}
+    return {"jobs_created": jobs_created, "rejected": rejected}
 
 
 @router.get("/{topic_id}/results/export")

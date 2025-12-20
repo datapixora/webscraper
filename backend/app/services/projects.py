@@ -19,11 +19,8 @@ class ProjectService:
         return await self.create(db, payload)
 
     async def create(self, db: AsyncSession, payload: ProjectCreate) -> Project:
-        project = Project(
-            name=payload.name,
-            description=payload.description,
-            extraction_schema=payload.extraction_schema,
-        )
+        # Persist all configurable fields so defaults from the schema are saved in the DB.
+        project = Project(**payload.model_dump())
         db.add(project)
         await db.commit()
         await db.refresh(project)
@@ -37,15 +34,16 @@ class ProjectService:
         return await db.get(Project, project_id)
 
     async def update(self, db: AsyncSession, project: Project, payload: ProjectUpdate) -> Project:
-        if payload.name is not None:
-            project.name = payload.name
-        if payload.description is not None:
-            project.description = payload.description
-        if payload.extraction_schema is not None:
-            project.extraction_schema = payload.extraction_schema
+        # Only apply fields provided by the client.
+        for field, value in payload.model_dump(exclude_unset=True).items():
+            setattr(project, field, value)
         await db.commit()
         await db.refresh(project)
         return project
+
+    async def delete(self, db: AsyncSession, project: Project) -> None:
+        await db.delete(project)
+        await db.commit()
 
 
 project_service = ProjectService()
