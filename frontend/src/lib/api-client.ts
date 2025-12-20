@@ -429,6 +429,78 @@ export async function motor3dRunAll(input: { project_id: string; max_urls?: numb
   );
 }
 
+// BidFax connector
+export async function bidfaxDiscover(params: {
+  base_url: string;
+  max_urls?: number;
+}): Promise<{ urls: string[]; count: number; pages_scraped: number; sample_urls: string[] }> {
+  return request<{ urls: string[]; count: number; pages_scraped: number; sample_urls: string[] }>(
+    `${API_PREFIX}/admin/connectors/bidfax/discover`,
+    {
+      method: 'POST',
+      body: JSON.stringify(params),
+    },
+  );
+}
+
+export async function bidfaxCreateJobs(input: {
+  project_id: string;
+  urls: string[];
+}): Promise<{ created: number; rejected: string[] }> {
+  return request<{ created: number; rejected: string[] }>(
+    `${API_PREFIX}/admin/connectors/bidfax/create-jobs`,
+    {
+      method: 'POST',
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export async function bidfaxParse(input: { url: string }): Promise<any> {
+  return request<any>(`${API_PREFIX}/admin/connectors/bidfax/parse`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function bidfaxListVehicles(projectId?: string): Promise<any[]> {
+  const url = new URL(`${API_PREFIX}/admin/connectors/bidfax/vehicles`);
+  if (projectId) url.searchParams.set('project_id', projectId);
+  return request<any[]>(url.toString());
+}
+
+export function bidfaxExportCsvUrl(projectId?: string): string {
+  const url = new URL(`${API_PREFIX}/admin/connectors/bidfax/export-csv`);
+  if (projectId) url.searchParams.set('project_id', projectId);
+  return url.toString();
+}
+
+export async function bidfaxRunAll(input: {
+  project_id: string;
+  base_url?: string;
+  max_urls?: number;
+}): Promise<{
+  discovered: number;
+  pages_scraped: number;
+  sample_urls: string[];
+  jobs_created: number;
+  jobs_rejected: number;
+  rejected: string[];
+}> {
+  const url = new URL(`${API_PREFIX}/admin/connectors/bidfax/run-all`);
+  url.searchParams.set('project_id', input.project_id);
+  if (input.base_url) url.searchParams.set('base_url', input.base_url);
+  if (input.max_urls) url.searchParams.set('max_urls', input.max_urls.toString());
+  return request<{
+    discovered: number;
+    pages_scraped: number;
+    sample_urls: string[];
+    jobs_created: number;
+    jobs_rejected: number;
+    rejected: string[];
+  }>(url.toString(), { method: 'POST' });
+}
+
 export async function updateDomainPolicy(
   id: string,
   input: {

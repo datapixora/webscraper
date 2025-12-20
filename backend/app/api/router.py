@@ -10,6 +10,7 @@ from app.api.v1.settings import router as settings_router
 from app.api.v1.admin_settings import router as admin_settings_router
 from app.api.v1.admin_domain_policies import router as admin_domain_policies_router
 from app.api.v1.admin_motor3d import router as admin_motor3d_router
+from app.api.v1.admin_bidfax import router as admin_bidfax_router
 
 api_router = APIRouter()
 
@@ -25,6 +26,7 @@ v1_router.include_router(settings_router, prefix="/settings", tags=["settings"])
 v1_router.include_router(admin_settings_router, prefix="/admin/settings", tags=["admin"])
 v1_router.include_router(admin_domain_policies_router, prefix="/admin/domain-policies", tags=["admin"])
 v1_router.include_router(admin_motor3d_router, prefix="/admin/connectors/motor3d", tags=["admin"])
+v1_router.include_router(admin_bidfax_router, prefix="/admin/connectors/bidfax", tags=["admin"])
 
 api_router.include_router(v1_router, prefix="/api")
 
