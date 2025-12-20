@@ -83,6 +83,14 @@ async function waitForHealth(url, timeoutMs = 120000) {
   throw new Error(`API health check did not pass within ${timeoutMs / 1000}s`);
 }
 
+async function showApiLogs() {
+  try {
+    await run(dockerCmd, ["compose", "logs", "--tail", "200", "api"]);
+  } catch (err) {
+    console.error("Failed to fetch api logs:", err.message ?? err);
+  }
+}
+
 async function startFrontend() {
   const frontendPort = process.env.FRONTEND_PORT || "3002";
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -168,5 +176,6 @@ async function main() {
 
 main().catch(async (err) => {
   console.error(err.message ?? err);
+  await showApiLogs();
   await shutdown(1);
 });

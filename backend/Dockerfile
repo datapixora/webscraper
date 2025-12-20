@@ -83,6 +83,9 @@ FROM playwright-setup as development
 
 # Copy application code
 COPY . .
+# Copy entrypoint and normalize line endings
+COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN sed -i 's/\r$//' /app/docker-entrypoint.sh && chmod +x /app/docker-entrypoint.sh
 
 # Create non-root user
 RUN useradd -m -u 1000 appuser && \
@@ -104,6 +107,9 @@ FROM playwright-setup as production
 
 # Copy application code only (no dev dependencies)
 COPY . .
+# Copy entrypoint and normalize line endings
+COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN sed -i 's/\r$//' /app/docker-entrypoint.sh && chmod +x /app/docker-entrypoint.sh
 
 # Create non-root user
 RUN useradd -m -u 1000 appuser && \
