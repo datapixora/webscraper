@@ -96,6 +96,16 @@ export const resultSchema = z.object({
 });
 export type Result = z.infer<typeof resultSchema>;
 
+export const domainPolicySchema = z.object({
+  id: z.string(),
+  domain: z.string(),
+  enabled: z.boolean(),
+  config: z.record(z.any()),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+export type DomainPolicy = z.infer<typeof domainPolicySchema>;
+
 // Campaigns (kept for backend compatibility)
 export const campaignSchema = z.object({
   id: z.string(),
@@ -304,6 +314,32 @@ export async function createJobsBatch(input: {
 export async function getJobResult(jobId: string): Promise<Result> {
   const data = await request<Result>(`${API_PREFIX}/jobs/${jobId}/results`);
   return resultSchema.parse(data);
+}
+
+// Domain policies (admin)
+export async function listDomainPolicies(): Promise<DomainPolicy[]> {
+  const data = await request<DomainPolicy[]>(`${API_PREFIX}/admin/domain-policies`);
+  return z.array(domainPolicySchema).parse(data);
+}
+
+export async function createDomainPolicy(input: {
+  domain: string;
+  enabled?: boolean;
+  config?: Record<string, any>;
+}): Promise<DomainPolicy> {
+  const data = await request<DomainPolicy>(`${API_PREFIX}/admin/domain-policies`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+  return domainPolicySchema.parse(data);
+}
+
+export async function updateDomainPolicy(id: string, input: { enabled?: boolean; config?: Record<string, any> }) {
+  const data = await request<DomainPolicy>(`${API_PREFIX}/admin/domain-policies/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  });
+  return domainPolicySchema.parse(data);
 }
 
 // Campaigns

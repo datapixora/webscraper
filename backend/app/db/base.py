@@ -11,6 +11,7 @@ Base = declarative_base()
 from app.models.project import Project  # noqa: E402
 from app.models.job import Job  # noqa: E402
 from app.models.result import Result  # noqa: E402
+from app.models.domain_policy import DomainPolicy  # noqa: E402
 from app.models.topic_campaign import TopicCampaign  # noqa: E402
 from app.models.crawled_page import CrawledPage  # noqa: E402
 from app.models.topic import Topic  # noqa: E402
@@ -30,4 +31,5 @@ __all__ = [
     "Setting",
     "Export",
     "ExportStatus",
+    "DomainPolicy",
 ]
