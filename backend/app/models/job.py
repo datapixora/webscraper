@@ -11,10 +11,12 @@ from app.models.mixins import TimestampMixin, UUIDPrimaryKeyMixin
 
 class JobStatus(str, Enum):
     PENDING = "pending"
+    QUEUED = "queued"
     RUNNING = "running"
     SUCCEEDED = "succeeded"
     FAILED = "failed"
     BLOCKED = "blocked"
+    CANCELLED = "cancelled"
 
 
 class Job(UUIDPrimaryKeyMixin, TimestampMixin, Base):
@@ -40,6 +42,7 @@ class Job(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     cron_expression: Mapped[str | None] = mapped_column(String(255))
     error_message: Mapped[str | None] = mapped_column(Text)
+    celery_task_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
     project: Mapped["Project"] = relationship("Project", back_populates="jobs")
     topic: Mapped[Optional["Topic"]] = relationship("Topic", back_populates="jobs")

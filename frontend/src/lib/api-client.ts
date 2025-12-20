@@ -278,6 +278,12 @@ export async function deleteProject(id: string): Promise<void> {
   await request<void>(`${API_PREFIX}/projects/${id}`, { method: 'DELETE' });
 }
 
+export async function stopProject(id: string): Promise<{ revoked: number; cancelled: number }> {
+  return request<{ revoked: number; cancelled: number }>(`${API_PREFIX}/projects/${id}/stop`, {
+    method: 'POST',
+  });
+}
+
 // Jobs
 export async function getJobs(): Promise<Job[]> {
   const data = await request<Job[]>(`${API_PREFIX}/jobs/`);

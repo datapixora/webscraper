@@ -45,5 +45,12 @@ class ProjectService:
         await db.delete(project)
         await db.commit()
 
+    async def set_pause(self, db: AsyncSession, project: Project, paused: bool) -> Project:
+        project.is_paused = paused
+        project.paused_at = datetime.utcnow() if paused else None
+        await db.commit()
+        await db.refresh(project)
+        return project
+
 
 project_service = ProjectService()

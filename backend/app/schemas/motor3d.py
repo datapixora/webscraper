@@ -26,6 +26,7 @@ class Motor3DCreateJobsRequest(BaseModel):
 
 class Motor3DCreateJobsResponse(BaseModel):
     created: int
+    job_ids: list[str]
     rejected: list[dict[str, str]]
 
 

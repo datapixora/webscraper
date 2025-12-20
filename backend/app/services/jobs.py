@@ -78,6 +78,14 @@ class JobService:
         )
         return result.scalars().all()
 
+    async def list_by_project_and_statuses(
+        self, db: AsyncSession, project_id: str, statuses: list[JobStatus]
+    ) -> list[Job]:
+        result = await db.execute(
+            select(Job).where(Job.project_id == project_id, Job.status.in_(statuses)).order_by(Job.created_at.desc())
+        )
+        return result.scalars().all()
+
     async def list(self, db: AsyncSession) -> list[Job]:
         result = await db.execute(select(Job).order_by(Job.created_at.desc()))
         return result.scalars().all()

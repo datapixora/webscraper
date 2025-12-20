@@ -212,6 +212,7 @@ async def create_jobs(payload: Motor3DCreateJobsRequest, db: AsyncSession = Depe
     )
     return Motor3DCreateJobsResponse(
         created=len(created),
+        job_ids=[j.id for j in created],
         rejected=[{"url": url, "reason": reason} for url, reason in rejected],
     )
 

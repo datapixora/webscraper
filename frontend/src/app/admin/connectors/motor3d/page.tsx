@@ -12,13 +12,14 @@ import {
   listDomainPolicies,
   Motor3DProduct,
   motor3dRunAll,
+  stopProject,
 } from "@/lib/api-client";
 
 export default function Motor3DPage() {
   const [sitemapUrl, setSitemapUrl] = useState("https://motor3dmodel.ir/wp-sitemap.xml");
   const [urlPrefix, setUrlPrefix] = useState("https://motor3dmodel.ir/product/");
   const [urls, setUrls] = useState<string[]>([]);
-  const [selectedUrls, setSelectedUrls] = useState<string[]>([]);
+  const [selectedUrls, setSelectedUrls] = useState<Set<string>>(() => new Set());
   const [sampleUrls, setSampleUrls] = useState<string[]>([]);
   const [discovering, setDiscovering] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -70,7 +71,7 @@ export default function Motor3DPage() {
     try {
       const res = await motor3dDiscover({ sitemap_url: sitemapUrl, url_prefix: urlPrefix });
       setUrls(res.urls || []);
-      setSelectedUrls(res.urls || []);
+      setSelectedUrls(new Set());
       setSampleUrls(res.sample_urls || res.urls || []);
       setFoundCount(res.count);
       setLastRun(new Date());
@@ -86,7 +87,7 @@ export default function Motor3DPage() {
       setError("Select a project first");
       return;
     }
-    const toCreate = selectedUrls.length > 0 ? selectedUrls : urls;
+    const toCreate = Array.from(selectedUrls);
     if (toCreate.length === 0) {
       setError("No URLs to create jobs");
       return;
@@ -94,6 +95,7 @@ export default function Motor3DPage() {
     setCreating(true);
     setError(null);
     try {
+      console.debug("motor3d create jobs", { selectedUrls: toCreate, projectId });
       const res = await motor3dCreateJobs({ project_id: projectId, urls: toCreate });
       setError(`Created ${res.created}, Rejected ${res.rejected.length}`);
     } catch (e: any) {
@@ -107,7 +109,7 @@ export default function Motor3DPage() {
     setParsing(true);
     setError(null);
     try {
-      const target = parseUrl || selectedUrls[0] || urls[0];
+      const target = parseUrl || Array.from(selectedUrls)[0] || urls[0];
       if (!target) {
         setError("Pick a URL to parse");
         setParsing(false);
@@ -143,14 +145,25 @@ export default function Motor3DPage() {
   };
 
   const toggleSelect = (url: string) => {
-    setSelectedUrls((prev) => (prev.includes(url) ? prev.filter((u) => u !== url) : [...prev, url]));
+    setSelectedUrls((prev) => {
+      const next = new Set(prev);
+      if (next.has(url)) {
+        next.delete(url);
+      } else {
+        next.add(url);
+      }
+      return next;
+    });
   };
 
-  const allSelected = useMemo(() => urls.length > 0 && selectedUrls.length === urls.length, [urls, selectedUrls]);
+  const allSelected = useMemo(() => urls.length > 0 && selectedUrls.size === urls.length, [urls, selectedUrls]);
 
   const toggleSelectAll = () => {
-    if (allSelected) setSelectedUrls([]);
-    else setSelectedUrls(urls);
+    if (allSelected) {
+      setSelectedUrls(new Set());
+    } else {
+      setSelectedUrls(new Set(urls));
+    }
   };
 
   return (
@@ -181,8 +194,8 @@ export default function Motor3DPage() {
             </div>
           </div>
           <p className="text-sm text-slate-200">
-            method: {policy.method} · proxy: {policy.use_proxy ? "on" : "off"} · delay: {policy.request_delay_ms} ms ·
-            concurrency: {policy.max_concurrency} · UA: {policy.user_agent || "default"}
+            method: {policy.method} | proxy: {policy.use_proxy ? "on" : "off"} | delay: {policy.request_delay_ms} ms |
+            concurrency: {policy.max_concurrency} | UA: {policy.user_agent || "default"}
           </p>
         </section>
       )}
@@ -211,17 +224,17 @@ export default function Motor3DPage() {
         <p className="text-sm text-slate-300">Found: {urls.length}</p>
         {lastRun && (
           <p className="text-xs text-slate-400">
-            Last run: {lastRun.toLocaleString()} · Total reported: {foundCount}
+            Last run: {lastRun.toLocaleString()} | Total reported: {foundCount}
           </p>
         )}
         {sampleUrls.length > 0 && (
           <div className="max-h-60 overflow-auto rounded-md border border-white/10 bg-slate-900/80 p-2 text-xs text-slate-200 space-y-1">
             <label className="flex items-center gap-2 text-xs text-emerald-200">
-              <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} /> Select all ({selectedUrls.length})
+              <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} /> Select all ({selectedUrls.size})
             </label>
             {urls.map((u) => (
               <label key={u} className="flex items-center gap-2">
-                <input type="checkbox" checked={selectedUrls.includes(u)} onChange={() => toggleSelect(u)} />
+                <input type="checkbox" checked={selectedUrls.has(u)} onChange={() => toggleSelect(u)} />
                 <span className="break-all">{u}</span>
               </label>
             ))}
@@ -254,17 +267,36 @@ export default function Motor3DPage() {
             Create motor3d project
           </button>
         </div>
+        {!projectId && <p className="text-xs text-amber-300">Select or create a project to enable actions.</p>}
         <button
           onClick={handleCreateJobs}
-          disabled={creating || urls.length === 0 || !projectId}
+          disabled={creating || selectedUrls.size === 0 || !projectId}
           className="rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
         >
-          {creating ? "Creating..." : "Create jobs for discovered URLs"}
+          {creating ? "Creating..." : "Create jobs for selected URLs"}
+        </button>
+        {selectedUrls.size === 0 && <p className="text-xs text-amber-300">Select at least one URL first.</p>}
+        <button
+          onClick={async () => {
+            if (!projectId) {
+              setError("Select a project first");
+              return;
+            }
+            try {
+              const res = await stopProject(projectId);
+              setError(`Stop requested. Cancelled: ${res.cancelled}, revoked: ${res.revoked}`);
+            } catch (e: any) {
+              setError(e?.message || "Stop failed");
+            }
+          }}
+          disabled={!projectId}
+          className="rounded-md border border-white/20 bg-white/5 px-3 py-2 text-sm font-semibold text-white hover:border-emerald-300/60 disabled:opacity-60"
+        >
+          Stop all jobs for this project
         </button>
       </section>
-
       <section className="rounded-lg border border-white/10 bg-white/5 p-4 space-y-3">
-        <h2 className="text-lg font-semibold text-white">3) Run all (discover → jobs → scrape)</h2>
+        <h2 className="text-lg font-semibold text-white">3) Run all (discover + create jobs + scrape)</h2>
         <button
           onClick={async () => {
             if (!projectId) {

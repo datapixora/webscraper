@@ -64,6 +64,11 @@ def run_scrape_job(job_id: str) -> dict[str, Any]:
                 logger.error("Project not found", extra={"project_id": job.project_id})
                 return {"error": "project not found"}
 
+            if project.is_paused:
+                job.status = JobStatus.CANCELLED
+                await db.commit()
+                return {"status": "cancelled", "job_id": job.id}
+
             # Start job
             await job_service.mark_started(db, job)
 
@@ -84,6 +89,10 @@ def run_scrape_job(job_id: str) -> dict[str, Any]:
                 scrape_result = await scrape_url_with_settings(
                     job.target_url, db, project.extraction_schema, job_id=job.id
                 )
+
+                if project.is_paused:
+                    await job_service.mark_finished(db, job, status=JobStatus.CANCELLED, error_message="project paused")
+                    return {"status": "cancelled", "job_id": job.id}
 
                 blocked = scrape_result.get("blocked") or False
                 block_reason = scrape_result.get("block_reason")
