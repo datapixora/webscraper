@@ -101,7 +101,12 @@ export const domainPolicySchema = z.object({
   id: z.string(),
   domain: z.string(),
   enabled: z.boolean(),
-  config: z.record(z.any()),
+  method: z.enum(['auto', 'http', 'playwright']),
+  use_proxy: z.boolean(),
+  request_delay_ms: z.number(),
+  max_concurrency: z.number(),
+  user_agent: z.string().nullable().optional(),
+  block_resources: z.boolean(),
   created_at: z.string(),
   updated_at: z.string(),
 });
@@ -326,7 +331,12 @@ export async function listDomainPolicies(): Promise<DomainPolicy[]> {
 export async function createDomainPolicy(input: {
   domain: string;
   enabled?: boolean;
-  config?: Record<string, any>;
+  method?: 'auto' | 'http' | 'playwright';
+  use_proxy?: boolean;
+  request_delay_ms?: number;
+  max_concurrency?: number;
+  user_agent?: string | null;
+  block_resources?: boolean;
 }): Promise<DomainPolicy> {
   const data = await request<DomainPolicy>(`${API_PREFIX}/admin/domain-policies/`, {
     method: 'POST',
@@ -335,7 +345,18 @@ export async function createDomainPolicy(input: {
   return domainPolicySchema.parse(data);
 }
 
-export async function updateDomainPolicy(id: string, input: { enabled?: boolean; config?: Record<string, any> }) {
+export async function updateDomainPolicy(
+  id: string,
+  input: {
+    enabled?: boolean;
+    method?: 'auto' | 'http' | 'playwright';
+    use_proxy?: boolean;
+    request_delay_ms?: number;
+    max_concurrency?: number;
+    user_agent?: string | null;
+    block_resources?: boolean;
+  },
+) {
   const data = await request<DomainPolicy>(`${API_PREFIX}/admin/domain-policies/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(input),

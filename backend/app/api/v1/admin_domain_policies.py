@@ -19,7 +19,17 @@ async def create_domain_policy(payload: DomainPolicyCreate, db: AsyncSession = D
     existing = await domain_policy_service.get_by_domain(db, payload.domain)
     if existing:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Policy for this domain already exists")
-    policy = await domain_policy_service.create(db, domain=payload.domain, enabled=payload.enabled, config=payload.config)
+    policy = await domain_policy_service.create(
+        db,
+        domain=payload.domain,
+        enabled=payload.enabled,
+        method=payload.method,
+        use_proxy=payload.use_proxy,
+        request_delay_ms=payload.request_delay_ms,
+        max_concurrency=payload.max_concurrency,
+        user_agent=payload.user_agent,
+        block_resources=payload.block_resources,
+    )
     return DomainPolicyRead.model_validate(policy)
 
 
@@ -38,7 +48,17 @@ async def update_domain_policy(
     policy = await domain_policy_service.get(db, policy_id)
     if not policy:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Domain policy not found")
-    updated = await domain_policy_service.update(db, policy, enabled=payload.enabled, config=payload.config)
+    updated = await domain_policy_service.update(
+        db,
+        policy,
+        enabled=payload.enabled,
+        method=payload.method,
+        use_proxy=payload.use_proxy,
+        request_delay_ms=payload.request_delay_ms,
+        max_concurrency=payload.max_concurrency,
+        user_agent=payload.user_agent,
+        block_resources=payload.block_resources,
+    )
     return DomainPolicyRead.model_validate(updated)
 
 

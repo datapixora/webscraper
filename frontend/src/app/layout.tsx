@@ -14,6 +14,7 @@ const navItems = [
   { href: '/jobs', label: 'Jobs' },
   { href: '/campaigns', label: 'Campaigns' },
   { href: '/topics', label: 'Topics' },
+  { href: '/admin/policies', label: 'Scrape Policies' },
   { href: process.env.NEXT_PUBLIC_API_BASE_URL ? `${process.env.NEXT_PUBLIC_API_BASE_URL}/docs` : 'http://localhost:8000/docs', label: 'API Docs', external: true },
 ];
 
