@@ -26,6 +26,10 @@ from app.services.products import product_service
 from app.services.projects import project_service
 from app.scraper import scrape_url_with_settings
 from app.services.proxy_config import get_httpx_proxy_dict
+from app.core.config import settings
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -80,8 +84,18 @@ async def discover_products(payload: Motor3DDiscoverRequest, db: AsyncSession = 
             policy=policy,
             max_urls=payload.max_urls,
         )
+    except ValueError as ve:
+        logger.exception("motor3d discover failed", extra={"domain": base})
+        raise HTTPException(
+            status_code=status.HTTP_424_FAILED_DEPENDENCY,
+            detail="Expected XML sitemap but got HTML (likely Cloudflare/proxy).",
+        ) from ve
     except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
+        logger.exception("motor3d discover failed", extra={"domain": base})
+        detail = "motor3d discover failed; see server logs"
+        if settings.environment == "development":
+            detail = f"{detail}: {str(exc)[:200]}"
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=detail) from exc
 
     sample = urls[: min(len(urls), 20)]
     return Motor3DDiscoverResponse(count=len(urls), sample_urls=sample, urls=urls)

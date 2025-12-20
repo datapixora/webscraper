@@ -20,10 +20,10 @@ async def main():
         sitemap_url="https://motor3dmodel.ir/wp-sitemap.xml",
         url_prefix="https://motor3dmodel.ir/product/",
         policy=policy,
-        max_urls=50,
+        max_urls=200,
     )
     print(f"Found {len(urls)} urls")
-    for u in urls[:5]:
+    for u in urls[:10]:
         print(u)
 
 
