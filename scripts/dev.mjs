@@ -165,8 +165,8 @@ async function main() {
   dotenv.config({ path: envPath });
   wireSignals();
 
-  log("Starting containers: db, redis, api...");
-  await run(dockerCmd, ["compose", "up", "-d", "--remove-orphans", "db", "redis", "api"]);
+  log("Starting containers: db, redis, api, worker...");
+  await run(dockerCmd, ["compose", "up", "-d", "--remove-orphans", "db", "redis", "api", "worker"]);
 
   log("Waiting for API health...");
   await waitForHealth("http://localhost:8000/health", 120000);

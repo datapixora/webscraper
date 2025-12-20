@@ -7,3 +7,4 @@
 - Add integration test for `/health` ensuring degraded status when DB is unreachable.
 - Consider optional flag in `scripts/dev.mjs` to skip `docker compose down` on exit for faster reload loops.
 - Capture backend + frontend logs in docs/troubleshooting for common Windows/Docker Desktop issues.
+- Add UI toast for job creation/logs when Celery enqueues to help debugging stuck jobs.
