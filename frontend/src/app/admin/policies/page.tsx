@@ -8,7 +8,19 @@ import {
   updateDomainPolicy,
 } from "@/lib/api-client";
 
-const defaultForm: Omit<DomainPolicy, "id" | "created_at" | "updated_at"> & { id?: string } = {
+type FormState = {
+  id?: string;
+  domain: string;
+  enabled: boolean;
+  method: "auto" | "http" | "playwright";
+  use_proxy: boolean;
+  request_delay_ms: number;
+  max_concurrency: number;
+  user_agent: string;
+  block_resources: boolean;
+};
+
+const emptyForm: FormState = {
   id: undefined,
   domain: "",
   enabled: true,
@@ -22,26 +34,29 @@ const defaultForm: Omit<DomainPolicy, "id" | "created_at" | "updated_at"> & { id
 
 export default function ScrapePoliciesPage() {
   const [policies, setPolicies] = useState<DomainPolicy[]>([]);
-  const [form, setForm] = useState(defaultForm);
+  const [form, setForm] = useState<FormState>(emptyForm);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const editing = useMemo(() => Boolean(form.id), [form.id]);
 
   const load = async () => {
+    setLoading(true);
     setError(null);
     try {
       const data = await listDomainPolicies();
       setPolicies(data);
     } catch (e: any) {
-      setError(e.message || "Failed to load policies");
+      setError(e?.message || "Failed to load policies");
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
     load();
   }, []);
-
-  const editing = useMemo(() => Boolean(form.id), [form.id]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,7 +70,7 @@ export default function ScrapePoliciesPage() {
         use_proxy: form.use_proxy,
         request_delay_ms: Number(form.request_delay_ms) || 0,
         max_concurrency: Number(form.max_concurrency) || 1,
-        user_agent: form.user_agent?.trim() || undefined,
+        user_agent: form.user_agent.trim() || undefined,
         block_resources: form.block_resources,
       };
       if (editing && form.id) {
@@ -63,27 +78,37 @@ export default function ScrapePoliciesPage() {
       } else {
         await createDomainPolicy(payload);
       }
-      setForm(defaultForm);
+      setForm(emptyForm);
       await load();
     } catch (err: any) {
-      setError(err.message || "Failed to save policy");
+      setError(err?.message || "Failed to save policy");
     } finally {
       setSaving(false);
     }
   };
 
   const startEdit = (p: DomainPolicy) => {
-    setForm({ ...p, id: p.id, user_agent: p.user_agent || "" });
+    setForm({
+      id: p.id,
+      domain: p.domain,
+      enabled: p.enabled,
+      method: p.method,
+      use_proxy: p.use_proxy,
+      request_delay_ms: p.request_delay_ms,
+      max_concurrency: p.max_concurrency,
+      user_agent: p.user_agent || "",
+      block_resources: p.block_resources,
+    });
   };
 
-  const cancelEdit = () => setForm(defaultForm);
+  const cancelEdit = () => setForm(emptyForm);
 
   return (
     <div className="space-y-6 p-4">
       <div>
         <h1 className="text-2xl font-semibold text-white">Scrape Policies</h1>
         <p className="text-sm text-slate-300">
-          Configure per-domain scraping behavior: method, proxy usage, throttling, and resource blocking.
+          Configure per-domain scraping behavior: method selection, proxy use, throttling, and resource blocking.
         </p>
       </div>
 
@@ -108,7 +133,7 @@ export default function ScrapePoliciesPage() {
             <select
               className="w-full rounded-md border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white"
               value={form.method}
-              onChange={(e) => setForm({ ...form, method: e.target.value as DomainPolicy["method"] })}
+              onChange={(e) => setForm({ ...form, method: e.target.value as FormState["method"] })}
             >
               <option value="auto">Auto (HTTP then fallback)</option>
               <option value="http">HTTP only</option>
@@ -198,7 +223,8 @@ export default function ScrapePoliciesPage() {
 
       <div className="space-y-2">
         <h2 className="text-lg font-semibold text-white">Existing policies</h2>
-        {policies.length === 0 && <p className="text-sm text-slate-300">No policies yet.</p>}
+        {loading && <p className="text-sm text-slate-300">Loading...</p>}
+        {!loading && policies.length === 0 && <p className="text-sm text-slate-300">No policies yet.</p>}
         <div className="space-y-2">
           {policies.map((p) => (
             <div
@@ -218,7 +244,7 @@ export default function ScrapePoliciesPage() {
                 </div>
                 <p className="text-slate-300">Method: {p.method}</p>
                 <p className="text-slate-300">Proxy: {p.use_proxy ? "on" : "off"}</p>
-                <p className="text-slate-300">Delay: {p.request_delay_ms} ms · Concurrency: {p.max_concurrency}</p>
+                <p className="text-slate-300">Delay: {p.request_delay_ms} ms Â· Concurrency: {p.max_concurrency}</p>
                 {p.user_agent && <p className="text-slate-300">UA: {p.user_agent}</p>}
                 <p className="text-slate-300">Block resources: {p.block_resources ? "yes" : "no"}</p>
                 <p className="text-[11px] text-slate-500">Updated: {new Date(p.updated_at).toLocaleString()}</p>
