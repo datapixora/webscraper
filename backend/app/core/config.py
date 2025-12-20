@@ -67,25 +67,26 @@ class Settings(BaseSettings):
                     merged.append(cleaned)
             return merged
 
-        if isinstance(value, str):
-            stripped = value.strip()
-            if stripped in ("", "[]"):
-                return default_origins
+        try:
+            if isinstance(value, str):
+                stripped = value.strip()
+                if stripped in ("", "[]"):
+                    return default_origins
 
-            if stripped.startswith("[") and stripped.endswith("]"):
-                try:
+                if stripped.startswith("[") and stripped.endswith("]"):
                     parsed = json.loads(stripped)
                     if isinstance(parsed, list):
                         cleaned = [str(origin).strip() for origin in parsed if str(origin).strip()]
                         return merge_with_defaults(cleaned)
-                except json.JSONDecodeError:
-                    pass
 
-            cleaned = [origin.strip() for origin in stripped.split(",") if origin.strip()]
-            return merge_with_defaults(cleaned)
+                cleaned = [origin.strip() for origin in stripped.split(",") if origin.strip()]
+                return merge_with_defaults(cleaned)
 
-        if isinstance(value, list):
-            return merge_with_defaults([str(v) for v in value if str(v).strip()])
+            if isinstance(value, list):
+                return merge_with_defaults([str(v) for v in value if str(v).strip()])
+        except Exception:
+            # Any parsing error: fall back to safe defaults
+            return default_origins
 
         return default_origins
 

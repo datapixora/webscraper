@@ -46,19 +46,24 @@ npm run dev
    - Frontend: http://localhost:3002
    - API: http://localhost:8000
    - API Docs (Swagger): http://localhost:8000/docs
+   - Quick smoke tests (confirm API + CORS):  
+     `curl -i http://localhost:8000/api/v1/topics/`  
+     `curl -i http://localhost:8000/api/v1/campaigns/`
 
 Useful npm scripts:
-- `npm run dev:logs` – follow API container logs
-- `npm run dev:down` – stop containers
-- `npm run dev:frontend` – run only the frontend on port 3002
-- `npm run dev:up` – start db/redis/api/worker without the frontend
+- `npm run dev:logs` - follow API container logs
+- `npm run dev:down` - stop containers
+- `npm run dev:frontend` - run only the frontend on port 3002
+- `npm run dev:up` - start db/redis/api/worker without the frontend
 
 Troubleshooting:
 - If ports 5432/6379/8000/3002 are in use, stop the conflicting app or change the port in `.env`.
 - Ensure Docker Desktop is running; `docker info` should succeed.
 - If health never reaches `db: true`, run `docker compose logs api` for details.
 - If jobs stay pending, check worker logs: `docker compose logs -f worker`.
-- After resetting the DB, clear browser localStorage if you see “Job not found” when selecting old jobs.
+- After resetting the DB, clear browser localStorage if you see "Job not found" when selecting old jobs.
+- CORS errors from `localhost:3000`/`3002`: the backend now falls back to allowing these origins even if `CORS_ORIGINS` is unset/invalid. If you override `CORS_ORIGINS`, include both http://localhost:3000 and http://localhost:3002.
+- Frontend API URL: `.env` defaults `NEXT_PUBLIC_API_URL` to `http://localhost:8000` and `scripts/dev.mjs` auto-creates `frontend/.env.local` if missing.
 
 ## Environment
 See `.env.example` for all variables. Key ones:
@@ -78,10 +83,10 @@ See `.env.example` for all variables. Key ones:
 - DB connectivity check: `cd backend && python -m scripts.db_ping`
 
 ## Useful Make targets
-- `make dev` – start all services with logs
-- `make migrate` / `make migrate-create MESSAGE="desc"` – Alembic
-- `make logs-backend` / `make logs-worker` – tail logs
-- `make format` / `make lint` – code quality
+- `make dev` - start all services with logs
+- `make migrate` / `make migrate-create MESSAGE="desc"` - Alembic
+- `make logs-backend` / `make logs-worker` - tail logs
+- `make format` / `make lint` - code quality
 
 ## Contributing
 - Run formatting and lint checks before PRs.

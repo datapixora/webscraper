@@ -1,9 +1,10 @@
 import { z } from 'zod';
 
-const API_BASE =
+const rawApiBase =
   process.env.NEXT_PUBLIC_API_BASE_URL ||
   process.env.NEXT_PUBLIC_API_URL ||
   'http://localhost:8000';
+const API_BASE = rawApiBase.replace(/\/+$/, '');
 const API_PREFIX = `${API_BASE}/api/v1`;
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
@@ -198,7 +199,7 @@ export type Setting = z.infer<typeof settingSchema>;
 
 // Projects
 export async function getProjects(): Promise<Project[]> {
-  const data = await request<Project[]>(`${API_PREFIX}/projects`);
+  const data = await request<Project[]>(`${API_PREFIX}/projects/`);
   return z.array(projectSchema).parse(data);
 }
 
@@ -208,7 +209,7 @@ export async function createProject(input: {
   content_type?: string;
   extraction_schema?: object | null;
 }): Promise<Project> {
-  const data = await request<Project>(`${API_PREFIX}/projects`, {
+  const data = await request<Project>(`${API_PREFIX}/projects/`, {
     method: 'POST',
     body: JSON.stringify(input),
   });
@@ -260,7 +261,7 @@ export async function deleteProject(id: string): Promise<void> {
 
 // Jobs
 export async function getJobs(): Promise<Job[]> {
-  const data = await request<Job[]>(`${API_PREFIX}/jobs`);
+  const data = await request<Job[]>(`${API_PREFIX}/jobs/`);
   return z.array(jobSchema).parse(data);
 }
 
@@ -318,7 +319,7 @@ export async function getJobResult(jobId: string): Promise<Result> {
 
 // Domain policies (admin)
 export async function listDomainPolicies(): Promise<DomainPolicy[]> {
-  const data = await request<DomainPolicy[]>(`${API_PREFIX}/admin/domain-policies`);
+  const data = await request<DomainPolicy[]>(`${API_PREFIX}/admin/domain-policies/`);
   return z.array(domainPolicySchema).parse(data);
 }
 
@@ -327,7 +328,7 @@ export async function createDomainPolicy(input: {
   enabled?: boolean;
   config?: Record<string, any>;
 }): Promise<DomainPolicy> {
-  const data = await request<DomainPolicy>(`${API_PREFIX}/admin/domain-policies`, {
+  const data = await request<DomainPolicy>(`${API_PREFIX}/admin/domain-policies/`, {
     method: 'POST',
     body: JSON.stringify(input),
   });
@@ -344,7 +345,7 @@ export async function updateDomainPolicy(id: string, input: { enabled?: boolean;
 
 // Campaigns
 export async function getCampaigns(): Promise<Campaign[]> {
-  const data = await request<Campaign[]>(`${API_PREFIX}/campaigns`);
+  const data = await request<Campaign[]>(`${API_PREFIX}/campaigns/`);
   return z.array(campaignSchema).parse(data);
 }
 
@@ -356,7 +357,7 @@ export async function createCampaign(input: {
   max_pages: number;
   follow_links: boolean;
 }): Promise<Campaign> {
-  const data = await request<Campaign>(`${API_PREFIX}/campaigns`, {
+  const data = await request<Campaign>(`${API_PREFIX}/campaigns/`, {
     method: 'POST',
     body: JSON.stringify(input),
   });
@@ -392,7 +393,7 @@ export async function getCampaignPages(params: {
 
 // Topics
 export async function getTopics(): Promise<Topic[]> {
-  const data = await request<Topic[]>(`${API_PREFIX}/topics`);
+  const data = await request<Topic[]>(`${API_PREFIX}/topics/`);
   return z.array(topicSchema).parse(data);
 }
 
@@ -404,7 +405,7 @@ export async function createTopic(input: {
   category?: string | null;
   directory_path?: string | null;
 }): Promise<Topic> {
-  const data = await request<Topic>(`${API_PREFIX}/topics`, {
+  const data = await request<Topic>(`${API_PREFIX}/topics/`, {
     method: 'POST',
     body: JSON.stringify(input),
   });
@@ -462,7 +463,7 @@ export async function scrapeSelectedTopicUrls(input: {
 
 // Settings
 export async function getSettings(): Promise<Setting[]> {
-  const data = await request<Setting[]>(`${API_PREFIX}/settings`);
+  const data = await request<Setting[]>(`${API_PREFIX}/settings/`);
   return z.array(settingSchema).parse(data);
 }
 
@@ -492,7 +493,7 @@ export async function getExports(params?: {
   date_from?: string;
   date_to?: string;
 }): Promise<Export[]> {
-  const url = new URL(`${API_PREFIX}/exports`);
+  const url = new URL(`${API_PREFIX}/exports/`);
   if (params?.project_id) url.searchParams.set('project_id', params.project_id);
   if (params?.topic_id) url.searchParams.set('topic_id', params.topic_id);
   if (params?.status) url.searchParams.set('export_status', params.status);
@@ -514,7 +515,7 @@ export async function createExport(input: {
   name: string;
   format: string;
 }): Promise<Export> {
-  const data = await request<Export>(`${API_PREFIX}/exports`, {
+  const data = await request<Export>(`${API_PREFIX}/exports/`, {
     method: 'POST',
     body: JSON.stringify(input),
   });
