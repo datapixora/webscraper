@@ -15,5 +15,19 @@ from app.models.topic_campaign import TopicCampaign  # noqa: E402
 from app.models.crawled_page import CrawledPage  # noqa: E402
 from app.models.topic import Topic  # noqa: E402
 from app.models.topic_url import TopicURL  # noqa: E402
+from app.models.setting import Setting  # noqa: E402
+from app.models.export import Export, ExportStatus  # noqa: E402
 
-__all__ = ["Base", "Project", "Job", "Result", "TopicCampaign", "CrawledPage", "Topic", "TopicURL"]
+__all__ = [
+    "Base",
+    "Project",
+    "Job",
+    "Result",
+    "TopicCampaign",
+    "CrawledPage",
+    "Topic",
+    "TopicURL",
+    "Setting",
+    "Export",
+    "ExportStatus",
+]
