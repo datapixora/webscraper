@@ -442,8 +442,16 @@ async def _fetch_playwright_with_proxy(
     timeout: float | None = None,
     user_agent: Optional[str] = None,
     block_resources: bool = True,
+    use_stealth: bool = True,
 ) -> str:
-    """Fetch URL with Playwright using provided proxy configuration."""
+    """Fetch URL with Playwright using provided proxy configuration and anti-detection."""
+    from app.services.stealth_browser import (
+        apply_stealth_async,
+        get_stealth_context_options,
+        get_additional_browser_args,
+        inject_stealth_scripts,
+    )
+
     # Log proxy config for debugging
     if proxy_config:
         masked_config = {
@@ -477,19 +485,49 @@ async def _fetch_playwright_with_proxy(
         await route.continue_()
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True, proxy=proxy_config)
-        context = await browser.new_context(user_agent=user_agent or "WebScraperBot/1.0")
+        # Launch browser with anti-detection args
+        # Note: headless=False may help bypass some Cloudflare detection
+        launch_options = {"headless": False, "proxy": proxy_config}
+        if use_stealth:
+            launch_options["args"] = get_additional_browser_args()
+            # Override headless for stealth mode
+            launch_options["headless"] = True  # Keep headless but with stealth modifications
+
+        browser = await p.chromium.launch(**launch_options)
+
+        # Create context with stealth options
+        if use_stealth:
+            context_options = get_stealth_context_options(user_agent=user_agent, randomize=True)
+        else:
+            context_options = {"user_agent": user_agent or "WebScraperBot/1.0"}
+
+        context = await browser.new_context(**context_options)
         page = await context.new_page()
+
+        # Apply stealth modifications
+        if use_stealth:
+            await apply_stealth_async(page)
+            await inject_stealth_scripts(page)
 
         if block_resources:
             await page.route("**/*", route_handler)
 
+        # Navigate with longer wait for complex JS sites
         await page.goto(
             url,
-            wait_until="domcontentloaded",
+            wait_until="networkidle",
             timeout=timeout or settings.playwright_timeout_ms,
         )
-        await page.wait_for_timeout(500)
+        # Wait for potential Cloudflare challenges
+        await page.wait_for_timeout(3000)
+
+        # Check if we got a Cloudflare challenge
+        page_text = await page.text_content("body") or ""
+        if "cloudflare" in page_text.lower() or "just a moment" in page_text.lower():
+            structured_logger.warning("cloudflare_challenge_detected", waiting=True)
+            # Wait longer for Cloudflare to resolve
+            await page.wait_for_timeout(5000)
+
         content = await page.content()
         await context.close()
         await browser.close()

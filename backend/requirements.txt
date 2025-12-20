@@ -40,12 +40,14 @@ flower==2.0.1
 # SCRAPING & HTTP
 # ==================================
 playwright==1.41.0
+playwright-stealth==1.0.6
 httpx==0.26.0
 aiohttp==3.9.1
 beautifulsoup4==4.12.3
 lxml==5.1.0
 selectolax==0.3.21
 html5lib==1.1
+fake-useragent==1.4.0
 
 # CSS/XPath Selectors
 cssselect==1.2.0
