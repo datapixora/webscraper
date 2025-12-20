@@ -35,7 +35,7 @@ async def _fetch_with_retry(client: httpx.AsyncClient, url: str, retries: int = 
 
 def _is_product_sitemap(loc: str) -> bool:
     lowered = loc.lower()
-    return any(key in lowered for key in ["product", "posts-product", "wc-product"])
+    return any(key in lowered for key in ["posts-product", "product", "wc-product"])
 
 
 def _is_product_url(loc: str, domain: str) -> bool:
@@ -60,6 +60,7 @@ async def discover_product_urls(
         seen: set[str] = set()
         to_visit = [sitemap_url]
         delay = max((policy.request_delay_ms if policy and policy.enabled else 0), 0) / 1000
+        product_sitemaps_seen: set[str] = set()
 
         while to_visit and len(seen) < max_urls:
             current = to_visit.pop()
@@ -73,9 +74,6 @@ async def discover_product_urls(
                 if loc.endswith(".xml"):
                     if _is_product_sitemap(loc):
                         product_sitemaps.append(loc)
-                    else:
-                        # still may contain product URLs; include to crawl
-                        product_sitemaps.append(loc)
                 elif _is_product_url(loc, domain):
                     product_urls.append(loc)
 
@@ -86,9 +84,19 @@ async def discover_product_urls(
                     seen.add(loc)
 
             for sm in product_sitemaps:
-                to_visit.append(sm)
+                if sm not in product_sitemaps_seen:
+                    product_sitemaps_seen.add(sm)
+                    to_visit.append(sm)
 
             if delay > 0 and to_visit:
                 await asyncio.sleep(delay)
 
+        logger.info(
+            "motor3d_discover_finished",
+            domain=domain,
+            sitemap_url=sitemap_url,
+            product_sitemaps=len(product_sitemaps_seen),
+            urls=len(seen),
+            max_urls=max_urls,
+        )
         return sorted(seen)

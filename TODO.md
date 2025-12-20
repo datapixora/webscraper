@@ -16,6 +16,7 @@
 - Add regression test to ensure domain_policies migration (0012) is applied and columns exist (method/use_proxy/etc.).
 - Add HTTP-only sitemap discover tests for Motor3D connector and wire into CI; mock httpx to avoid Playwright dependency.
 - Add CLI/script smoke for Motor3D sitemap discover (`python -m scripts.test_motor3d_discover`) and assert non-zero URLs.
+- Add logs/metrics for Motor3D product sitemap discovery (counts of sitemaps/urls) in CI smoke.
 
 ## Proxy & Scraping (Recently Implemented)
 ✅ **Admin Proxy Settings UI + Backend Storage**
