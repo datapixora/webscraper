@@ -81,17 +81,31 @@ async def create_jobs_batch(payload: JobBatchCreate, db: AsyncSession = Depends(
     Create multiple jobs for a project, applying project URL rules.
     Returns created jobs and rejected URLs with reasons.
     """
-    project = await project_service.get(db, payload.project_id)
+    # Support both new shape (jobs list) and legacy (project_id + urls)
+    if payload.jobs:
+        project_id = payload.jobs[0].project_id
+        topic_id = payload.jobs[0].topic_id
+        urls = [j.target_url for j in payload.jobs]
+        name_prefix = payload.name_prefix or "Job"
+        allow_duplicates = bool(payload.allow_duplicates)
+    else:
+        project_id = payload.project_id
+        topic_id = payload.topic_id
+        urls = payload.urls or []
+        name_prefix = payload.name_prefix or "Job"
+        allow_duplicates = bool(payload.allow_duplicates)
+
+    project = await project_service.get(db, project_id)
     if not project:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
 
     created, rejected = await job_service.create_many_validated(
         db,
         project=project,
-        urls=payload.urls,
-        topic_id=payload.topic_id,
-        name_prefix=payload.name_prefix or "Job",
-        skip_dedup=bool(payload.allow_duplicates),
+        urls=urls,
+        topic_id=topic_id,
+        name_prefix=name_prefix,
+        skip_dedup=allow_duplicates,
     )
 
     logger.info(
