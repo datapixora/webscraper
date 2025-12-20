@@ -445,11 +445,14 @@ async def _fetch_playwright_with_proxy(
     use_stealth: bool = True,
 ) -> str:
     """Fetch URL with Playwright using provided proxy configuration and anti-detection."""
+    from urllib.parse import urlparse
     from app.services.stealth_browser import (
         apply_stealth_async,
         get_stealth_context_options,
         get_additional_browser_args,
         inject_stealth_scripts,
+        load_session,
+        save_session,
     )
 
     # Log proxy config for debugging
@@ -502,6 +505,12 @@ async def _fetch_playwright_with_proxy(
             context_options = {"user_agent": user_agent or "WebScraperBot/1.0"}
 
         context = await browser.new_context(**context_options)
+
+        # Load previous session cookies if available (recommended by browserless.io)
+        domain = urlparse(url).netloc
+        if use_stealth and domain:
+            await load_session(context, domain)
+
         page = await context.new_page()
 
         # Apply stealth modifications
@@ -518,17 +527,46 @@ async def _fetch_playwright_with_proxy(
             wait_until="networkidle",
             timeout=timeout or settings.playwright_timeout_ms,
         )
-        # Wait for potential Cloudflare challenges
-        await page.wait_for_timeout(3000)
+
+        # Wait for initial JavaScript to execute
+        await page.wait_for_timeout(2000)
+
+        # Check for CAPTCHA iframe (recommended by browserless.io)
+        captcha_iframe = await page.query_selector('iframe[src*="captcha"]')
+        if captcha_iframe:
+            structured_logger.warning(
+                "captcha_detected",
+                has_iframe=True,
+                message="CAPTCHA iframe found - requires solving service or manual intervention"
+            )
+            # Wait longer to see if auto-solving would help
+            await page.wait_for_timeout(10000)
 
         # Check if we got a Cloudflare challenge
         page_text = await page.text_content("body") or ""
         if "cloudflare" in page_text.lower() or "just a moment" in page_text.lower():
             structured_logger.warning("cloudflare_challenge_detected", waiting=True)
-            # Wait longer for Cloudflare to resolve
-            await page.wait_for_timeout(5000)
+            # Wait for Cloudflare JS challenge to resolve (typically 5-10 seconds)
+            await page.wait_for_timeout(8000)
+
+            # Check again if challenge resolved
+            page_text_after = await page.text_content("body") or ""
+            if "cloudflare" in page_text_after.lower():
+                structured_logger.error(
+                    "cloudflare_challenge_failed",
+                    message="Challenge did not resolve after waiting"
+                )
 
         content = await page.content()
+
+        # Save session for future requests (if scrape was successful)
+        # This makes subsequent requests look like a returning user
+        if use_stealth and domain and content and len(content) > 1000:
+            # Only save if we got substantial content (not just a block page)
+            page_lower = content.lower()
+            if not ("cloudflare" in page_lower or "access denied" in page_lower):
+                await save_session(context, domain)
+
         await context.close()
         await browser.close()
         return content

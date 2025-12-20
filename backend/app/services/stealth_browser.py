@@ -7,12 +7,19 @@ Provides:
 - User agent rotation
 - Viewport randomization
 - Timezone and locale spoofing
+- Session persistence with cookies
 """
+import json
 import random
+from pathlib import Path
 from typing import Optional, Dict, Any, List
 import structlog
 
 logger = structlog.get_logger(__name__)
+
+# Session storage directory
+SESSION_DIR = Path("/tmp/playwright_sessions")
+SESSION_DIR.mkdir(exist_ok=True)
 
 
 class StealthConfig:
@@ -199,3 +206,74 @@ async def inject_stealth_scripts(page):
         logger.debug("stealth_scripts_injected")
     except Exception as e:
         logger.error("stealth_script_injection_failed", error=str(e))
+
+
+def get_session_file(domain: str) -> Path:
+    """
+    Get session file path for a domain.
+
+    Args:
+        domain: Domain name (e.g., 'bidfax.info')
+
+    Returns:
+        Path to session file
+    """
+    safe_domain = domain.replace(".", "_").replace(":", "_")
+    return SESSION_DIR / f"{safe_domain}_session.json"
+
+
+async def save_session(context, domain: str):
+    """
+    Save browser session (cookies, localStorage) for a domain.
+
+    Args:
+        context: Playwright browser context
+        domain: Domain name to save session for
+    """
+    try:
+        session_file = get_session_file(domain)
+        cookies = await context.cookies()
+
+        session_data = {
+            "cookies": cookies,
+            "domain": domain,
+        }
+
+        with open(session_file, "w") as f:
+            json.dump(session_data, f)
+
+        logger.info("session_saved", domain=domain, cookie_count=len(cookies))
+    except Exception as e:
+        logger.error("session_save_failed", domain=domain, error=str(e))
+
+
+async def load_session(context, domain: str) -> bool:
+    """
+    Load browser session for a domain.
+
+    Args:
+        context: Playwright browser context
+        domain: Domain name to load session for
+
+    Returns:
+        True if session was loaded, False otherwise
+    """
+    try:
+        session_file = get_session_file(domain)
+        if not session_file.exists():
+            logger.debug("session_not_found", domain=domain)
+            return False
+
+        with open(session_file, "r") as f:
+            session_data = json.load(f)
+
+        cookies = session_data.get("cookies", [])
+        if cookies:
+            await context.add_cookies(cookies)
+            logger.info("session_loaded", domain=domain, cookie_count=len(cookies))
+            return True
+
+        return False
+    except Exception as e:
+        logger.error("session_load_failed", domain=domain, error=str(e))
+        return False
