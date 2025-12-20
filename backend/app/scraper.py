@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
-from typing import Any, Literal, TypedDict
+from typing import Any, Literal, TypedDict, Optional
 
 import httpx
 import structlog
@@ -11,6 +11,7 @@ from bs4 import BeautifulSoup
 from parsel import Selector
 from playwright.async_api import async_playwright
 from urllib.parse import urljoin, urldefrag
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.services.proxy_config import get_httpx_proxy_dict, get_playwright_proxy_dict
@@ -220,6 +221,225 @@ def extract_with_schema(html: str, extraction_schema: dict[str, Any] | None) -> 
             data[name] = _extract(nodes) if hasattr(nodes, "attrib") else _extract(nodes[0]) if nodes else ""
 
     return data
+
+
+async def scrape_url_with_settings(
+    url: str,
+    db: AsyncSession,
+    extraction_schema: dict[str, Any] | None = None,
+    force_method: ScrapeMethod | None = None,
+    job_id: Optional[str] = None,
+) -> ScrapeResult:
+    """
+    Scrape URL with dynamic settings from database (proxy, delays, retries, etc).
+
+    Args:
+        url: Target URL
+        db: Database session for fetching settings
+        extraction_schema: Optional extraction schema
+        force_method: Force specific scrape method (overrides policy)
+        job_id: Job ID for sticky sessions
+
+    Returns:
+        ScrapeResult with raw HTML, structured data, and metadata
+    """
+    from app.services.proxy_manager import (
+        get_proxy_settings,
+        get_proxy_for_request,
+        get_request_delay,
+        should_retry_on_status,
+        clear_sticky_session,
+    )
+
+    proxy_settings = await get_proxy_settings(db)
+    max_retries = proxy_settings.proxy_retry_count
+
+    # Apply request delay
+    delay_sec = await get_request_delay(db)
+    if delay_sec > 0:
+        await asyncio.sleep(delay_sec)
+
+    raw_html = ""
+    http_status: int | None = None
+    page_title: str | None = None
+    blocked = False
+    block_reason: str | None = None
+    method_used: ScrapeMethod = "httpx"
+
+    # Determine scrape method based on policy
+    if force_method:
+        target_method = force_method
+    elif proxy_settings.scrape_method_policy == "http":
+        target_method = "httpx"
+    elif proxy_settings.scrape_method_policy == "browser":
+        target_method = "playwright"
+    else:  # auto
+        target_method = None  # Will try httpx first, then playwright
+
+    # Retry loop
+    for attempt in range(max_retries + 1):
+        is_retry = attempt > 0
+
+        try:
+            # Get proxy for this attempt
+            httpx_proxy, playwright_proxy = await get_proxy_for_request(
+                db, job_id=job_id, url=url, is_retry=is_retry
+            )
+
+            if target_method == "playwright":
+                raw_html = await _fetch_playwright_with_proxy(url, playwright_proxy)
+                method_used = "playwright"
+                # Extract title and check for blocks
+                soup = BeautifulSoup(raw_html, "html.parser")
+                page_title = soup.title.string.strip() if soup.title and soup.title.string else None
+                blocked, block_reason = _detect_block(status=http_status, title=page_title, html=raw_html)
+                break  # Success
+            else:
+                # Try httpx first (or if auto policy)
+                try:
+                    resp = await _fetch_httpx_response_with_proxy(url, httpx_proxy)
+                    raw_html = resp.text
+                    http_status = resp.status_code
+                    method_used = "httpx"
+
+                    # Check for blocks
+                    blocked, block_reason = _detect_block(status=http_status, html=raw_html)
+
+                    if blocked:
+                        # Check if we should retry
+                        if is_retry or not await should_retry_on_status(db, http_status):
+                            # Don't retry, return blocked result
+                            break
+                        else:
+                            # Retry with new proxy
+                            clear_sticky_session(job_id=job_id)
+                            logger.warning(
+                                "blocked_retrying",
+                                url=url,
+                                status=http_status,
+                                reason=block_reason,
+                                attempt=attempt + 1,
+                            )
+                            continue
+
+                    # Check if needs JS rendering (for auto policy)
+                    if target_method is None and _needs_js_render(raw_html):
+                        # Fallback to playwright
+                        try:
+                            raw_html = await _fetch_playwright_with_proxy(url, playwright_proxy)
+                            method_used = "playwright"
+                            soup = BeautifulSoup(raw_html, "html.parser")
+                            page_title = soup.title.string.strip() if soup.title and soup.title.string else None
+                            blocked, block_reason = _detect_block(status=http_status, title=page_title, html=raw_html)
+                        except Exception as playwright_err:
+                            logger.warning("Playwright fallback failed", exc_info=playwright_err)
+                            method_used = "httpx"
+
+                    break  # Success
+
+                except httpx.HTTPStatusError as e:
+                    http_status = e.response.status_code
+
+                    # Check if we should retry
+                    if await should_retry_on_status(db, http_status):
+                        clear_sticky_session(job_id=job_id)
+                        logger.warning(
+                            "http_error_retrying",
+                            url=url,
+                            status=http_status,
+                            attempt=attempt + 1,
+                        )
+                        continue
+                    else:
+                        # Don't retry, fall back to playwright if auto policy
+                        if target_method is None:
+                            raw_html = await _fetch_playwright_with_proxy(url, playwright_proxy)
+                            method_used = "playwright"
+                            break
+                        raise
+
+        except Exception as exc:
+            if attempt == max_retries:
+                # Last attempt failed, raise
+                logger.exception("scrape_failed_all_retries", url=url, attempts=max_retries + 1)
+                raise
+            else:
+                # Retry
+                clear_sticky_session(job_id=job_id)
+                logger.warning("scrape_attempt_failed_retrying", url=url, attempt=attempt + 1, error=str(exc))
+                continue
+
+    structured = extract_with_schema(raw_html, extraction_schema)
+    return {
+        "raw_html": raw_html,
+        "structured_data": structured,
+        "method": method_used,
+        "http_status": http_status,
+        "blocked": blocked,
+        "block_reason": block_reason,
+        "title": page_title,
+    }
+
+
+async def _fetch_httpx_response_with_proxy(
+    url: str, proxy_dict: Optional[Dict[str, str]], timeout: float | None = None
+) -> httpx.Response:
+    """Fetch URL with httpx using provided proxy configuration."""
+    async with httpx.AsyncClient(
+        timeout=timeout or settings.http_timeout,
+        headers={"User-Agent": "WebScraperBot/1.0"},
+        follow_redirects=True,
+        proxies=proxy_dict,
+    ) as client:
+        resp = await client.get(url)
+        return resp
+
+
+async def _fetch_playwright_with_proxy(
+    url: str, proxy_config: Optional[Dict[str, any]], timeout: float | None = None
+) -> str:
+    """Fetch URL with Playwright using provided proxy configuration."""
+    BLOCKED_RESOURCE_TYPES = ["image", "media", "font", "stylesheet"]
+    BLOCKED_URL_PATTERNS = [
+        r".*\.(jpg|jpeg|png|gif|webp|svg|ico)$",
+        r".*\.(woff|woff2|ttf|eot)$",
+        r".*\.(mp4|mp3|wav|webm)$",
+        r".*(google-analytics|googletagmanager|facebook|doubleclick|analytics).*",
+    ]
+
+    async def route_handler(route):
+        resource_type = route.request.resource_type
+        url_to_check = route.request.url
+
+        if resource_type in BLOCKED_RESOURCE_TYPES:
+            await route.abort()
+            return
+
+        for pattern in BLOCKED_URL_PATTERNS:
+            if re.match(pattern, url_to_check, re.IGNORECASE):
+                await route.abort()
+                return
+
+        await route.continue_()
+
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True, proxy=proxy_config)
+        context = await browser.new_context()
+        page = await context.new_page()
+
+        if settings.playwright_block_resources:
+            await page.route("**/*", route_handler)
+
+        await page.goto(
+            url,
+            wait_until="domcontentloaded",
+            timeout=timeout or settings.playwright_timeout_ms,
+        )
+        await page.wait_for_timeout(500)
+        content = await page.content()
+        await context.close()
+        await browser.close()
+        return content
 
 
 async def scrape_url(

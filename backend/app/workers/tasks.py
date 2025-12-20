@@ -78,7 +78,12 @@ def run_scrape_job(job_id: str) -> dict[str, Any]:
                 return {"status": "blocked", "reason": validation.reason}
 
             try:
-                scrape_result = await scrape_url(job.target_url, project.extraction_schema)
+                # Use new scrape function with dynamic settings
+                from app.scraper import scrape_url_with_settings
+
+                scrape_result = await scrape_url_with_settings(
+                    job.target_url, db, project.extraction_schema, job_id=job.id
+                )
 
                 blocked = scrape_result.get("blocked") or False
                 block_reason = scrape_result.get("block_reason")
@@ -120,7 +125,7 @@ def run_scrape_job(job_id: str) -> dict[str, Any]:
                     await job_service.mark_finished(
                         db,
                         job,
-                        status=JobStatus.FAILED,
+                        status=JobStatus.BLOCKED,
                         error_message=block_reason or f"blocked (status {http_status})",
                     )
                     return {"status": "blocked", "reason": block_reason, "http_status": http_status}

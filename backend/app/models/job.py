@@ -14,12 +14,16 @@ class JobStatus(str, Enum):
     RUNNING = "running"
     SUCCEEDED = "succeeded"
     FAILED = "failed"
+    BLOCKED = "blocked"
 
 
 class Job(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "jobs"
 
     project_id: Mapped[str] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), index=True)
+    topic_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("topics.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     target_url: Mapped[str] = mapped_column(String(2048), nullable=False)
     status: Mapped[JobStatus] = mapped_column(
@@ -38,6 +42,7 @@ class Job(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     error_message: Mapped[str | None] = mapped_column(Text)
 
     project: Mapped["Project"] = relationship("Project", back_populates="jobs")
+    topic: Mapped[Optional["Topic"]] = relationship("Topic", back_populates="jobs")
     result: Mapped[Optional["Result"]] = relationship(
         "Result", back_populates="job", uselist=False, cascade="all, delete-orphan"
     )
