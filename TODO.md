@@ -14,6 +14,7 @@
 - Add react-query tests covering jobs page mutations (create batch jobs) to prevent undefined mutation crashes.
 - Add E2E around new Scrape Policies page (/admin/policies) to verify CRUD + backend enforcement per domain.
 - Add regression test to ensure domain_policies migration (0012) is applied and columns exist (method/use_proxy/etc.).
+- Add HTTP-only sitemap discover tests for Motor3D connector and wire into CI; mock httpx to avoid Playwright dependency.
 
 ## Proxy & Scraping (Recently Implemented)
 ✅ **Admin Proxy Settings UI + Backend Storage**
