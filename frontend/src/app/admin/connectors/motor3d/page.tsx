@@ -12,6 +12,7 @@ export default function Motor3DPage() {
   const [sitemapUrl, setSitemapUrl] = useState("https://motor3dmodel.ir/wp-sitemap.xml");
   const [urlPrefix, setUrlPrefix] = useState("https://motor3dmodel.ir/product/");
   const [urls, setUrls] = useState<string[]>([]);
+  const [sampleUrls, setSampleUrls] = useState<string[]>([]);
   const [discovering, setDiscovering] = useState(false);
   const [creating, setCreating] = useState(false);
   const [parsing, setParsing] = useState(false);
@@ -28,7 +29,8 @@ export default function Motor3DPage() {
     setError(null);
     try {
       const res = await motor3dDiscover({ sitemap_url: sitemapUrl, url_prefix: urlPrefix });
-      setUrls(res.urls || res.sample_urls || []);
+      setUrls(res.urls || []);
+      setSampleUrls(res.sample_urls || res.urls || []);
       setFoundCount(res.count);
       setLastRun(new Date());
     } catch (e: any) {
@@ -113,9 +115,9 @@ export default function Motor3DPage() {
             Last run: {lastRun.toLocaleString()} · Total reported: {foundCount}
           </p>
         )}
-        {urls.length > 0 && (
+        {sampleUrls.length > 0 && (
           <div className="max-h-48 overflow-auto rounded-md border border-white/10 bg-slate-900/80 p-2 text-xs text-slate-200">
-            {urls.slice(0, 50).map((u) => (
+            {sampleUrls.slice(0, 50).map((u) => (
               <div key={u}>{u}</div>
             ))}
             {urls.length > 50 && <div>... (+{urls.length - 50} more)</div>}

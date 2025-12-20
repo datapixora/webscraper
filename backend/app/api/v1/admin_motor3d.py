@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
+from app.connectors.motor3d import discover_product_urls
 from app.schemas.motor3d import (
     Motor3DCreateJobsRequest,
     Motor3DCreateJobsResponse,
@@ -52,12 +53,16 @@ async def _fetch_xml(client: httpx.AsyncClient, url: str) -> str:
 
 @router.post("/discover", response_model=Motor3DDiscoverResponse)
 async def discover_products(payload: Motor3DDiscoverRequest, db: AsyncSession = Depends(get_db)) -> Motor3DDiscoverResponse:
-    # load policy (or defaults) for motor3d
-    policy = await domain_policy_service.get_by_domain(db, "motor3dmodel.ir")
+    domain = payload.domain or "motor3dmodel.ir"
+    base = domain.replace("https://", "").replace("http://", "").strip("/")
+    sitemap_url = payload.sitemap_url or f"https://{base}/wp-sitemap.xml"
+    url_prefix = payload.url_prefix or f"https://{base}/product/"
+
+    policy = await domain_policy_service.get_by_domain(db, base)
     if not policy:
         policy = await domain_policy_service.create(
             db,
-            domain="motor3dmodel.ir",
+            domain=base,
             enabled=True,
             method="http",
             use_proxy=False,
@@ -66,40 +71,19 @@ async def discover_products(payload: Motor3DDiscoverRequest, db: AsyncSession = 
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             block_resources=True,
         )
-    use_proxy = bool(policy and policy.enabled and policy.use_proxy)
-    user_agent = policy.user_agent if policy and policy.enabled else None
-    delay_sec = max((policy.request_delay_ms if policy and policy.enabled else 0), 0) / 1000
-
-    client = await _make_client(use_proxy, user_agent)
-    seen: set[str] = set()
-    to_visit = [payload.sitemap_url]
 
     try:
-        while to_visit and len(seen) < payload.limit:
-            current = to_visit.pop()
-            try:
-                xml_text = await _fetch_xml(client, current)
-            except Exception as exc:  # noqa: BLE001
-                raise HTTPException(
-                    status_code=status.HTTP_424_FAILED_DEPENDENCY,
-                    detail=f"Failed to fetch sitemap {current}: {exc}",
-                )
-            locs = _parse_sitemap(xml_text)
-            for loc in locs:
-                if loc.endswith(".xml"):
-                    to_visit.append(loc)
-                    continue
-                if "/product/" in loc and loc.startswith(payload.url_prefix):
-                    seen.add(loc)
-                if len(seen) >= payload.limit:
-                    break
-            if delay_sec > 0 and to_visit:
-                await asyncio.sleep(delay_sec)
-    finally:
-        await client.aclose()
+        urls = await discover_product_urls(
+            domain=base,
+            sitemap_url=sitemap_url,
+            url_prefix=url_prefix,
+            policy=policy,
+            max_urls=payload.max_urls,
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
 
-    urls = sorted(seen)
-    sample = urls[: min(len(urls), 50)]
+    sample = urls[: min(len(urls), 20)]
     return Motor3DDiscoverResponse(count=len(urls), sample_urls=sample, urls=urls)
 
 

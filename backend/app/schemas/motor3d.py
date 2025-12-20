@@ -4,9 +4,10 @@ from pydantic import BaseModel, Field, HttpUrl
 
 
 class Motor3DDiscoverRequest(BaseModel):
-    sitemap_url: HttpUrl = Field(default="https://motor3dmodel.ir/wp-sitemap.xml")
-    url_prefix: HttpUrl = Field(default="https://motor3dmodel.ir/product/")
-    limit: int = Field(default=5000, ge=1, le=20000)
+    sitemap_url: HttpUrl | None = Field(default=None)
+    domain: str | None = Field(default="motor3dmodel.ir")
+    url_prefix: HttpUrl | None = Field(default=None)
+    max_urls: int = Field(default=2000, ge=1, le=20000)
 
 
 class Motor3DDiscoverResponse(BaseModel):
