@@ -122,6 +122,20 @@ export default function JobsPage() {
         )}
         {selectedJobId && resultQuery.data && (
           <div className="mt-3 space-y-3">
+            {resultQuery.data.blocked && (
+              <div className="rounded-md border border-amber-400/40 bg-amber-500/10 p-3 text-sm text-amber-100">
+                <p className="font-semibold">
+                  Blocked {resultQuery.data.http_status ? `(${resultQuery.data.http_status})` : ''}
+                </p>
+                <p className="text-amber-200">
+                  Reason: {resultQuery.data.block_reason || 'Access denied / anti-bot detected.'}
+                </p>
+                <p className="mt-2 text-amber-100/80">
+                  Suggestions: rotate proxy / region, use residential IP, slow down requests, randomize headers, or
+                  retry with Playwright.
+                </p>
+              </div>
+            )}
             <div>
               <p className="text-xs text-slate-400">Structured Data</p>
               <JsonViewer data={resultQuery.data.structured_data ?? {}} />

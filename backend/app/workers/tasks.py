@@ -21,6 +21,9 @@ from app.services.search_provider import search_provider, SearchResult
 from app.services.topics import topic_service
 from app.services.topic_urls import topic_url_service
 from app.services.storage import storage_service
+from app.services.exports import export_service
+from app.services.export_generator import export_generator
+from app.schemas.export import ExportCreate
 from app.scraper import scrape_url
 from app.workers.celery_app import celery_app
 from urllib.parse import urlparse
@@ -64,24 +67,77 @@ def run_scrape_job(job_id: str) -> dict[str, Any]:
             # Start job
             await job_service.mark_started(db, job)
 
+            # Validate URL against current project rules before scraping
+            from app.services.url_validator import url_validator
+
+            validation = await url_validator.validate_url(db, project, job.target_url, skip_dedup=True)
+            if not validation.allowed:
+                await job_service.mark_finished(
+                    db, job, status=JobStatus.FAILED, error_message=validation.reason or "URL blocked"
+                )
+                return {"status": "blocked", "reason": validation.reason}
+
             try:
                 scrape_result = await scrape_url(job.target_url, project.extraction_schema)
+
+                blocked = scrape_result.get("blocked") or False
+                block_reason = scrape_result.get("block_reason")
+                http_status = scrape_result.get("http_status")
+                method_used = scrape_result.get("method")
+
                 storage_meta = storage_service.save_raw_html(
                     project_id=project.id, job_id=job.id, html=scrape_result["raw_html"]
                 )
                 preview = scrape_result["raw_html"][:4000]
+                structured_data = scrape_result["structured_data"] or {}
+                structured_data = {
+                    **structured_data,
+                    "_meta": {
+                        "http_status": http_status,
+                        "blocked": blocked,
+                        "block_reason": block_reason,
+                        "method_used": method_used,
+                    },
+                }
+
                 result_payload = ResultCreate(
                     job_id=job.id,
                     project_id=project.id,
-                    structured_data=scrape_result["structured_data"],
+                    structured_data=structured_data,
                     raw_html=preview,
                     raw_html_path=storage_meta["path"],
                     raw_html_checksum=storage_meta["checksum"],
                     raw_html_size=storage_meta["size_bytes"],
                     raw_html_compressed_size=storage_meta["compressed_size_bytes"],
+                    http_status=http_status,
+                    blocked=blocked,
+                    block_reason=block_reason,
+                    method_used=method_used,
                 )
                 await result_service.upsert(db, payload=result_payload)
+
+                if blocked:
+                    await job_service.mark_finished(
+                        db,
+                        job,
+                        status=JobStatus.FAILED,
+                        error_message=block_reason or f"blocked (status {http_status})",
+                    )
+                    return {"status": "blocked", "reason": block_reason, "http_status": http_status}
+
                 await job_service.mark_finished(db, job, status=JobStatus.SUCCEEDED, error_message=None)
+
+                # Auto-export if enabled on project
+                if project.auto_export_enabled:
+                    export_payload = ExportCreate(
+                        project_id=project.id,
+                        topic_id=job.topic_id,
+                        name=f"job-{job.id}",
+                        format=(project.output_formats or ["jsonl"])[0],
+                    )
+                    export = await export_service.create(db, export_payload)
+                    await export_generator.generate(db, export)
+
                 return {"status": "ok", "job_id": job.id, "method": scrape_result["method"]}
             except Exception as exc:  # noqa: BLE001
                 await job_service.mark_finished(db, job, status=JobStatus.FAILED, error_message=str(exc))

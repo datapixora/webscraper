@@ -87,8 +87,12 @@ export const resultSchema = z.object({
   raw_html_checksum: z.string().nullable().optional(),
   raw_html_size: z.number().nullable().optional(),
   raw_html_compressed_size: z.number().nullable().optional(),
-  created_at: z.string(),
-  updated_at: z.string(),
+  http_status: z.number().nullable().optional(),
+  blocked: z.boolean().nullable().optional(),
+  block_reason: z.string().nullable().optional(),
+  method_used: z.string().nullable().optional(),
+  created_at: z.string().optional().nullable(),
+  updated_at: z.string().optional().nullable(),
 });
 export type Result = z.infer<typeof resultSchema>;
 

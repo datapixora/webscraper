@@ -2,19 +2,23 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from typing import Any, Literal, TypedDict
 
 import httpx
+import structlog
 from bs4 import BeautifulSoup
 from parsel import Selector
 from playwright.async_api import async_playwright
 from urllib.parse import urljoin, urldefrag
 
 from app.core.config import settings
+from app.services.proxy_config import get_httpx_proxy_dict, get_playwright_proxy_dict
 
 ScrapeMethod = Literal["httpx", "playwright"]
 
 logger = logging.getLogger(__name__)
+structured_logger = structlog.get_logger(__name__)
 
 
 class ExtractionField(TypedDict, total=False):
@@ -29,6 +33,10 @@ class ScrapeResult(TypedDict):
     raw_html: str
     structured_data: dict[str, Any]
     method: ScrapeMethod
+    http_status: int | None
+    blocked: bool
+    block_reason: str | None
+    title: str | None
 
 
 class PageCrawlResult(TypedDict):
@@ -45,39 +53,139 @@ def _needs_js_render(html: str) -> bool:
     return script_count > 15 or has_spa_markers or len(html) < 5000
 
 
+def _detect_block(
+    *, status: int | None, title: str | None = None, html: str | None = None
+) -> tuple[bool, str | None]:
+    if status in {403, 429, 503}:
+        return True, f"http_status_{status}"
+
+    text = (title or "").lower()
+    html_lower = (html or "").lower()
+    title_markers = ["access denied", "forbidden", "attention required", "cloudflare"]
+    html_markers = ["cf-chl", "captcha", "access denied", "forbidden", "cloudflare"]
+
+    if any(marker in text for marker in title_markers):
+        return True, "title_block_marker"
+    if any(marker in html_lower for marker in html_markers):
+        return True, "html_block_marker"
+
+    return False, None
+
+
 async def fetch_httpx(url: str, timeout: float | None = None) -> str:
-    async with httpx.AsyncClient(
-        timeout=timeout or settings.http_timeout, headers={"User-Agent": "WebScraperBot/1.0"}
-    ) as client:
-        resp = await client.get(url)
-        resp.raise_for_status()
-        return resp.text
+    proxy_dict = get_httpx_proxy_dict()
+    try:
+        async with httpx.AsyncClient(
+            timeout=timeout or settings.http_timeout,
+            headers={"User-Agent": "WebScraperBot/1.0"},
+            proxies=proxy_dict,
+        ) as client:
+            resp = await client.get(url)
+            resp.raise_for_status()
+            return resp.text
+    except httpx.ProxyError as e:
+        structured_logger.error(
+            "proxy_connection_failed",
+            url=url,
+            error=str(e),
+            proxy_configured=proxy_dict is not None,
+        )
+        raise
+    except httpx.HTTPStatusError as e:
+        structured_logger.error("http_error", url=url, status=e.response.status_code)
+        raise
 
 
 async def fetch_httpx_response(url: str, timeout: float | None = None) -> httpx.Response:
-    async with httpx.AsyncClient(
-        timeout=timeout or settings.http_timeout,
-        headers={"User-Agent": "WebScraperBot/1.0"},
-        follow_redirects=True,
-    ) as client:
-        resp = await client.get(url)
-        return resp
+    proxy_dict = get_httpx_proxy_dict()
+    try:
+        async with httpx.AsyncClient(
+            timeout=timeout or settings.http_timeout,
+            headers={"User-Agent": "WebScraperBot/1.0"},
+            follow_redirects=True,
+            proxies=proxy_dict,
+        ) as client:
+            resp = await client.get(url)
+            return resp
+    except httpx.ProxyError as e:
+        structured_logger.error(
+            "proxy_connection_failed",
+            url=url,
+            error=str(e),
+            proxy_configured=proxy_dict is not None,
+        )
+        raise
+    except httpx.HTTPStatusError as e:
+        structured_logger.error("http_error", url=url, status=e.response.status_code)
+        raise
 
 
 async def fetch_playwright(url: str, timeout: float | None = None) -> str:
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-        page = await browser.new_page()
-        await page.goto(
-            url,
-            wait_until="domcontentloaded",
-            timeout=timeout or settings.playwright_timeout_ms,
-        )
-        # Give the page a moment to settle for dynamic content
-        await page.wait_for_timeout(500)
-        content = await page.content()
-        await browser.close()
-        return content
+    proxy_config = get_playwright_proxy_dict()
+
+    # Define blocked resource types and URL patterns for bandwidth optimization
+    BLOCKED_RESOURCE_TYPES = ["image", "media", "font", "stylesheet"]
+    BLOCKED_URL_PATTERNS = [
+        r".*\.(jpg|jpeg|png|gif|webp|svg|ico)$",
+        r".*\.(woff|woff2|ttf|eot)$",
+        r".*\.(mp4|mp3|wav|webm)$",
+        r".*(google-analytics|googletagmanager|facebook|doubleclick|analytics).*",
+    ]
+
+    async def route_handler(route):
+        """Block unwanted resources to save bandwidth."""
+        resource_type = route.request.resource_type
+        url_to_check = route.request.url
+
+        # Block unwanted resource types
+        if resource_type in BLOCKED_RESOURCE_TYPES:
+            await route.abort()
+            return
+
+        # Block unwanted URL patterns
+        for pattern in BLOCKED_URL_PATTERNS:
+            if re.match(pattern, url_to_check, re.IGNORECASE):
+                await route.abort()
+                return
+
+        # Allow all other requests
+        await route.continue_()
+
+    try:
+        async with async_playwright() as p:
+            # Launch browser with proxy configuration
+            browser = await p.chromium.launch(headless=True, proxy=proxy_config)
+            context = await browser.new_context()
+            page = await context.new_page()
+
+            # Register route handler for resource blocking (if enabled)
+            if settings.playwright_block_resources:
+                await page.route("**/*", route_handler)
+
+            await page.goto(
+                url,
+                wait_until="domcontentloaded",
+                timeout=timeout or settings.playwright_timeout_ms,
+            )
+            # Give the page a moment to settle for dynamic content
+            await page.wait_for_timeout(500)
+            content = await page.content()
+            await context.close()
+            await browser.close()
+            return content
+    except Exception as e:
+        # Catch Playwright errors including proxy errors
+        error_msg = str(e)
+        if "proxy" in error_msg.lower() or "net::" in error_msg.lower():
+            structured_logger.error(
+                "playwright_proxy_error",
+                url=url,
+                error=error_msg,
+                proxy_configured=proxy_config is not None,
+            )
+        else:
+            structured_logger.error("playwright_error", url=url, error=error_msg)
+        raise
 
 
 def extract_with_schema(html: str, extraction_schema: dict[str, Any] | None) -> dict[str, Any]:
@@ -121,6 +229,10 @@ async def scrape_url(
     Auto-detect static vs JS-heavy pages. Falls back to Playwright if needed.
     """
     raw_html = ""
+    http_status: int | None = None
+    page_title: str | None = None
+    blocked = False
+    block_reason: str | None = None
     method_used: ScrapeMethod = "httpx"
 
     if force_method == "playwright":
@@ -128,7 +240,22 @@ async def scrape_url(
         method_used = "playwright"
     else:
         try:
-            raw_html = await fetch_httpx(url)
+            resp = await fetch_httpx_response(url)
+            raw_html = resp.text
+            http_status = resp.status_code
+            blocked, block_reason = _detect_block(status=http_status, html=raw_html)
+            if blocked:
+                method_used = "httpx"
+                structured = extract_with_schema(raw_html, extraction_schema)
+                return {
+                    "raw_html": raw_html,
+                    "structured_data": structured,
+                    "method": method_used,
+                    "http_status": http_status,
+                    "blocked": blocked,
+                    "block_reason": block_reason,
+                    "title": None,
+                }
             if force_method == "httpx":
                 method_used = "httpx"
             elif _needs_js_render(raw_html):
@@ -143,8 +270,23 @@ async def scrape_url(
             raw_html = await fetch_playwright(url)
             method_used = "playwright"
 
+    # If Playwright was used, capture block markers
+    if method_used == "playwright":
+        # Attempt to get title quickly via BeautifulSoup to avoid extra browser call
+        soup = BeautifulSoup(raw_html, "html.parser")
+        page_title = soup.title.string.strip() if soup.title and soup.title.string else None
+        blocked, block_reason = _detect_block(status=http_status, title=page_title, html=raw_html)
+
     structured = extract_with_schema(raw_html, extraction_schema)
-    return {"raw_html": raw_html, "structured_data": structured, "method": method_used}
+    return {
+        "raw_html": raw_html,
+        "structured_data": structured,
+        "method": method_used,
+        "http_status": http_status,
+        "blocked": blocked,
+        "block_reason": block_reason,
+        "title": page_title,
+    }
 
 
 def scrape_url_sync(
