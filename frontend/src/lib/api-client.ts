@@ -345,6 +345,58 @@ export async function createDomainPolicy(input: {
   return domainPolicySchema.parse(data);
 }
 
+// Motor3D connector
+export async function motor3dDiscover(params?: {
+  sitemap_url?: string;
+  url_prefix?: string;
+  limit?: number;
+}): Promise<{ count: number; urls: string[] }> {
+  const data = await request<{ count: number; urls: string[] }>(`${API_PREFIX}/admin/connectors/motor3d/discover`, {
+    method: 'POST',
+    body: JSON.stringify(params || {}),
+  });
+  return data;
+}
+
+export async function motor3dCreateJobs(input: {
+  project_id: string;
+  urls: string[];
+  policy_domain?: string;
+  name_prefix?: string;
+  allow_duplicates?: boolean;
+}): Promise<{ created: number; rejected: { url: string; reason: string }[] }> {
+  return request<{ created: number; rejected: { url: string; reason: string }[] }>(
+    `${API_PREFIX}/admin/connectors/motor3d/create-jobs`,
+    {
+      method: 'POST',
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export async function motor3dParse(input: { url: string; method?: 'auto' | 'http' | 'playwright' }) {
+  return request<any>(`${API_PREFIX}/admin/connectors/motor3d/parse`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function motor3dListProducts(): Promise<
+  {
+    url: string;
+    title?: string | null;
+    price_text?: string | null;
+    images: string[];
+    categories: string[];
+    tags: string[];
+    description_html?: string | null;
+    sku?: string | null;
+    raw: any;
+  }[]
+> {
+  return request(`${API_PREFIX}/admin/connectors/motor3d/products`);
+}
+
 export async function updateDomainPolicy(
   id: string,
   input: {
