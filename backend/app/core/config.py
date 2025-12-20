@@ -16,7 +16,7 @@ class Settings(BaseSettings):
 
     # CORS
     backend_cors_origins: List[str] = Field(
-        default=["http://localhost:3002", "http://localhost:8000"],
+        default=["http://localhost:3000", "http://localhost:3002", "http://localhost:8000"],
         alias="CORS_ORIGINS",
     )
 
@@ -57,7 +57,7 @@ class Settings(BaseSettings):
     @field_validator("backend_cors_origins", mode="before")
     @classmethod
     def split_cors_origins(cls, value: str | List[str]) -> List[str]:
-        default_origins = ["http://localhost:3002", "http://localhost:8000"]
+        default_origins = ["http://localhost:3000", "http://localhost:3002", "http://localhost:8000"]
 
         def merge_with_defaults(origins: list[str]) -> List[str]:
             merged: List[str] = []

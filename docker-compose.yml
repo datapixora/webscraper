@@ -51,7 +51,7 @@ services:
       CELERY_RESULT_BACKEND: redis://redis:6379/0
       SECRET_KEY: ${SECRET_KEY:-dev-secret-key-change-in-production}
       ENVIRONMENT: ${ENVIRONMENT:-development}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3002,http://localhost:8000}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:3002,http://localhost:8000}
       SMARTPROXY_ENABLED: ${SMARTPROXY_ENABLED:-false}
       SMARTPROXY_HOST: ${SMARTPROXY_HOST:-}
       SMARTPROXY_PORT: ${SMARTPROXY_PORT:-}
