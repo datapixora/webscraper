@@ -1,4 +1,5 @@
 from functools import lru_cache
+import json
 from typing import List
 
 from pydantic import Field, ValidationInfo, field_validator
@@ -15,7 +16,7 @@ class Settings(BaseSettings):
 
     # CORS
     backend_cors_origins: List[str] = Field(
-        default=["http://localhost:3000", "http://localhost:8000"],
+        default=["http://localhost:3002", "http://localhost:8000"],
         alias="CORS_ORIGINS",
     )
 
@@ -34,6 +35,15 @@ class Settings(BaseSettings):
     # Scraper
     playwright_timeout_ms: int = Field(default=20000, alias="PLAYWRIGHT_TIMEOUT")
     http_timeout: float = Field(default=30.0, alias="DEFAULT_TIMEOUT")
+    playwright_block_resources: bool = Field(default=True, alias="PLAYWRIGHT_BLOCK_RESOURCES")
+
+    # SmartProxy Configuration
+    smartproxy_enabled: bool = Field(default=False, alias="SMARTPROXY_ENABLED")
+    smartproxy_host: str = Field(default="", alias="SMARTPROXY_HOST")
+    smartproxy_port: int = Field(default=7000, alias="SMARTPROXY_PORT")
+    smartproxy_username: str = Field(default="", alias="SMARTPROXY_USERNAME")
+    smartproxy_password: str = Field(default="", alias="SMARTPROXY_PASSWORD")
+    smartproxy_country: str = Field(default="", alias="SMARTPROXY_COUNTRY")
 
     # Storage
     storage_backend: str = Field(default="local", alias="STORAGE_BACKEND")
@@ -47,9 +57,37 @@ class Settings(BaseSettings):
     @field_validator("backend_cors_origins", mode="before")
     @classmethod
     def split_cors_origins(cls, value: str | List[str]) -> List[str]:
+        default_origins = ["http://localhost:3002", "http://localhost:8000"]
+
+        def merge_with_defaults(origins: list[str]) -> List[str]:
+            merged: List[str] = []
+            for origin in origins + default_origins:
+                cleaned = origin.strip()
+                if cleaned and cleaned not in merged:
+                    merged.append(cleaned)
+            return merged
+
         if isinstance(value, str):
-            return [origin.strip() for origin in value.split(",") if origin.strip()]
-        return value
+            stripped = value.strip()
+            if stripped in ("", "[]"):
+                return default_origins
+
+            if stripped.startswith("[") and stripped.endswith("]"):
+                try:
+                    parsed = json.loads(stripped)
+                    if isinstance(parsed, list):
+                        cleaned = [str(origin).strip() for origin in parsed if str(origin).strip()]
+                        return merge_with_defaults(cleaned)
+                except json.JSONDecodeError:
+                    pass
+
+            cleaned = [origin.strip() for origin in stripped.split(",") if origin.strip()]
+            return merge_with_defaults(cleaned)
+
+        if isinstance(value, list):
+            return merge_with_defaults([str(v) for v in value if str(v).strip()])
+
+        return default_origins
 
     @field_validator("celery_broker_url", "celery_result_backend", mode="before")
     @classmethod

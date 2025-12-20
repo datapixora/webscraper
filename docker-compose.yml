@@ -1,87 +1,101 @@
-version: '3.8'
-
 services:
-  # PostgreSQL Database
-  postgres:
+  db:
     image: postgres:16-alpine
-    container_name: webscraper_postgres
+    container_name: webscraper_db
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-webscraper}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-webscraper_dev_password}
       POSTGRES_DB: ${POSTGRES_DB:-webscraper_db}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-webscraper}"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
     networks:
       - webscraper_network
 
-  # Redis for caching and task queue
   redis:
     image: redis:7-alpine
     container_name: webscraper_redis
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
     networks:
       - webscraper_network
 
-  # FastAPI Backend
-  backend:
+  api:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: webscraper_backend
+      target: development
+    container_name: webscraper_api
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-webscraper}:${POSTGRES_PASSWORD:-webscraper_dev_password}@postgres:5432/${POSTGRES_DB:-webscraper_db}
-      - REDIS_URL=redis://redis:6379/0
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
-      - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-production}
-      - ENVIRONMENT=${ENVIRONMENT:-development}
-      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://localhost:8000}
+      POSTGRES_USER: ${POSTGRES_USER:-webscraper}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-webscraper_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-webscraper_db}
+      DB_HOST: db
+      DB_PORT: 5432
+      DATABASE_URL: postgresql://${POSTGRES_USER:-webscraper}:${POSTGRES_PASSWORD:-webscraper_dev_password}@db:5432/${POSTGRES_DB:-webscraper_db}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-key-change-in-production}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3002,http://localhost:8000}
+      SMARTPROXY_ENABLED: ${SMARTPROXY_ENABLED:-false}
+      SMARTPROXY_HOST: ${SMARTPROXY_HOST:-}
+      SMARTPROXY_PORT: ${SMARTPROXY_PORT:-}
+      SMARTPROXY_USERNAME: ${SMARTPROXY_USERNAME:-}
+      SMARTPROXY_PASSWORD: ${SMARTPROXY_PASSWORD:-}
+      SMARTPROXY_COUNTRY: ${SMARTPROXY_COUNTRY:-}
+      BACKEND_PORT: ${BACKEND_PORT:-8000}
     ports:
-      - "${BACKEND_PORT:-8000}:8000"
+      - "8000:8000"
     volumes:
       - ./backend:/app
       - /app/__pycache__
     depends_on:
-      postgres:
+      db:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    entrypoint: ["/app/docker-entrypoint.sh"]
     networks:
       - webscraper_network
 
-  # Celery Worker for background tasks
   worker:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      target: development
     container_name: webscraper_worker
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-webscraper}:${POSTGRES_PASSWORD:-webscraper_dev_password}@postgres:5432/${POSTGRES_DB:-webscraper_db}
-      - REDIS_URL=redis://redis:6379/0
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
-      - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-production}
-      - ENVIRONMENT=${ENVIRONMENT:-development}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-webscraper}:${POSTGRES_PASSWORD:-webscraper_dev_password}@db:5432/${POSTGRES_DB:-webscraper_db}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-key-change-in-production}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      SMARTPROXY_ENABLED: ${SMARTPROXY_ENABLED:-false}
+      SMARTPROXY_HOST: ${SMARTPROXY_HOST:-}
+      SMARTPROXY_PORT: ${SMARTPROXY_PORT:-}
+      SMARTPROXY_USERNAME: ${SMARTPROXY_USERNAME:-}
+      SMARTPROXY_PASSWORD: ${SMARTPROXY_PASSWORD:-}
+      SMARTPROXY_COUNTRY: ${SMARTPROXY_COUNTRY:-}
     volumes:
       - ./backend:/app
     depends_on:
-      postgres:
+      db:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -89,23 +103,29 @@ services:
     networks:
       - webscraper_network
 
-  # Celery Beat for scheduled tasks
   beat:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      target: development
     container_name: webscraper_beat
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-webscraper}:${POSTGRES_PASSWORD:-webscraper_dev_password}@postgres:5432/${POSTGRES_DB:-webscraper_db}
-      - REDIS_URL=redis://redis:6379/0
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
-      - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-production}
-      - ENVIRONMENT=${ENVIRONMENT:-development}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-webscraper}:${POSTGRES_PASSWORD:-webscraper_dev_password}@db:5432/${POSTGRES_DB:-webscraper_db}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-key-change-in-production}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      SMARTPROXY_ENABLED: ${SMARTPROXY_ENABLED:-false}
+      SMARTPROXY_HOST: ${SMARTPROXY_HOST:-}
+      SMARTPROXY_PORT: ${SMARTPROXY_PORT:-}
+      SMARTPROXY_USERNAME: ${SMARTPROXY_USERNAME:-}
+      SMARTPROXY_PASSWORD: ${SMARTPROXY_PASSWORD:-}
+      SMARTPROXY_COUNTRY: ${SMARTPROXY_COUNTRY:-}
     volumes:
       - ./backend:/app
     depends_on:
-      postgres:
+      db:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -113,40 +133,44 @@ services:
     networks:
       - webscraper_network
 
-  # Next.js Frontend
-  frontend:
+  web:
     build:
       context: ./frontend
       dockerfile: Dockerfile
       target: development
-    container_name: webscraper_frontend
+    container_name: webscraper_web
     environment:
-      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000}
-      - NODE_ENV=development
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+      NODE_ENV: development
+      PORT: ${FRONTEND_PORT:-3002}
     ports:
-      - "${FRONTEND_PORT:-3000}:3000"
+      - "3002:3002"
     volumes:
       - ./frontend:/app
       - /app/node_modules
       - /app/.next
     depends_on:
-      - backend
+      api:
+        condition: service_started
+    command: npm run dev -- --hostname 0.0.0.0 --port ${FRONTEND_PORT:-3002}
     networks:
       - webscraper_network
 
-  # Flower for Celery monitoring (optional, for dev)
   flower:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      target: development
     container_name: webscraper_flower
     environment:
-      - REDIS_URL=redis://redis:6379/0
+      REDIS_URL: redis://redis:6379/0
     ports:
       - "${FLOWER_PORT:-5555}:5555"
     depends_on:
-      - redis
-      - worker
+      redis:
+        condition: service_healthy
+      worker:
+        condition: service_started
     command: celery -A app.workers.celery_app flower --port=5555
     networks:
       - webscraper_network

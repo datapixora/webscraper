@@ -45,6 +45,7 @@ parts/
 sdist/
 var/
 wheels/
+wheelhouse/
 *.egg-info/
 .installed.cfg
 *.egg
