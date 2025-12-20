@@ -1,0 +1,2 @@
+# Security auditing / tooling (not installed in Docker images)
+safety==3.0.1

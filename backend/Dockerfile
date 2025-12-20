@@ -81,9 +81,6 @@ RUN mkdir -p /ms-playwright && playwright install chromium
 # ==================================
 FROM playwright-setup as development
 
-# Install development dependencies
-RUN pip install -r requirements-dev.txt
-
 # Copy application code
 COPY . .
 
