@@ -14,6 +14,7 @@ const envExamplePath = path.join(rootDir, ".env.example");
 
 const dockerCmd = "docker";
 const npmCmd = process.platform === "win32" ? "npm.cmd" : "npm";
+const useShell = process.platform === "win32";
 
 let frontendProc;
 let shuttingDown = false;
@@ -101,16 +102,18 @@ async function startFrontend() {
     NEXT_PUBLIC_API_URL: apiUrl,
   };
 
+  const frontendDir = path.join(rootDir, "frontend");
+  const args = ["run", "dev", "--", "--hostname", "0.0.0.0", "--port", frontendPort];
+
   log(`Starting frontend on http://localhost:${frontendPort} (API ${apiUrl})...`);
-  frontendProc = spawn(
-    npmCmd,
-    ["run", "dev", "--", "--hostname", "0.0.0.0", "--port", frontendPort],
-    {
-      cwd: path.join(rootDir, "frontend"),
-      env,
-      stdio: "inherit",
-    },
-  );
+  log(`(manual fallback) cd frontend && ${npmCmd} run dev -- --hostname 0.0.0.0 --port ${frontendPort}`);
+
+  frontendProc = spawn(npmCmd, args, {
+    cwd: frontendDir,
+    env,
+    stdio: "inherit",
+    shell: useShell,
+  });
 
   return new Promise((resolve, reject) => {
     frontendProc.on("error", reject);
@@ -133,12 +136,7 @@ async function shutdown(exitCode = 0) {
     frontendProc.kill("SIGINT");
   }
 
-  try {
-    await run(dockerCmd, ["compose", "down"]);
-  } catch (err) {
-    console.error("Failed to stop docker compose:", err.message ?? err);
-  }
-
+  // Do NOT stop containers automatically; leave them running for inspection.
   process.exit(exitCode);
 }
 
@@ -157,7 +155,7 @@ async function main() {
   wireSignals();
 
   log("Starting containers: db, redis, api...");
-  await run(dockerCmd, ["compose", "up", "-d", "db", "redis", "api"]);
+  await run(dockerCmd, ["compose", "up", "-d", "--remove-orphans", "db", "redis", "api"]);
 
   log("Waiting for API health...");
   await waitForHealth("http://localhost:8000/health", 120000);
@@ -165,17 +163,20 @@ async function main() {
   log("Launching frontend (Next.js)...");
   try {
     await startFrontend();
-    // If the frontend exits naturally, shut everything down.
-    await shutdown(0);
+    // If the frontend exits naturally, leave containers up.
+    process.exit(0);
   } catch (err) {
     console.error(err.message ?? err);
     console.error("Tip: run `npm run dev:logs` to inspect backend logs.");
-    await shutdown(1);
+    console.error("Manual frontend start: cd frontend && npm run dev -- --hostname 0.0.0.0 --port 3002");
+    // Do not tear down containers; they stay up for debugging.
+    process.exit(1);
   }
 }
 
 main().catch(async (err) => {
   console.error(err.message ?? err);
   await showApiLogs();
-  await shutdown(1);
+  // leave containers running for investigation
+  process.exit(1);
 });
