@@ -1,4 +1,4 @@
-from sqlalchemy import JSON, String, Text
+from sqlalchemy import JSON, String, Text, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -8,6 +8,7 @@ from app.models.mixins import TimestampMixin, UUIDPrimaryKeyMixin
 class Product(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "products"
 
+    project_id: Mapped[str | None] = mapped_column(String, ForeignKey("projects.id", ondelete="SET NULL"), nullable=True, index=True)
     domain: Mapped[str] = mapped_column(String(255), index=True, nullable=False)
     url: Mapped[str] = mapped_column(String(1024), unique=True, nullable=False, index=True)
     title: Mapped[str | None] = mapped_column(String(512), nullable=True)

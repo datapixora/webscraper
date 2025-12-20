@@ -112,6 +112,20 @@ export const domainPolicySchema = z.object({
 });
 export type DomainPolicy = z.infer<typeof domainPolicySchema>;
 
+export const motor3dProductSchema = z.object({
+  url: z.string(),
+  title: z.string().nullable().optional(),
+  price_text: z.string().nullable().optional(),
+  images: z.array(z.string()),
+  specs: z.array(z.string()).optional(),
+  categories: z.array(z.string()),
+  tags: z.array(z.string()),
+  description_html: z.string().nullable().optional(),
+  sku: z.string().nullable().optional(),
+  raw: z.record(z.any()),
+});
+export type Motor3DProduct = z.infer<typeof motor3dProductSchema>;
+
 // Campaigns (kept for backend compatibility)
 export const campaignSchema = z.object({
   id: z.string(),
@@ -350,11 +364,14 @@ export async function motor3dDiscover(params?: {
   sitemap_url?: string;
   url_prefix?: string;
   limit?: number;
-}): Promise<{ count: number; urls: string[] }> {
-  const data = await request<{ count: number; urls: string[] }>(`${API_PREFIX}/admin/connectors/motor3d/discover`, {
-    method: 'POST',
-    body: JSON.stringify(params || {}),
-  });
+}): Promise<{ count: number; sample_urls: string[]; urls: string[] }> {
+  const data = await request<{ count: number; sample_urls: string[]; urls: string[] }>(
+    `${API_PREFIX}/admin/connectors/motor3d/discover`,
+    {
+      method: 'POST',
+      body: JSON.stringify(params || {}),
+    },
+  );
   return data;
 }
 
@@ -374,27 +391,26 @@ export async function motor3dCreateJobs(input: {
   );
 }
 
-export async function motor3dParse(input: { url: string; method?: 'auto' | 'http' | 'playwright' }) {
+export async function motor3dParse(input: {
+  url: string;
+  method?: 'auto' | 'http' | 'playwright';
+  project_id?: string;
+}) {
   return request<any>(`${API_PREFIX}/admin/connectors/motor3d/parse`, {
     method: 'POST',
     body: JSON.stringify(input),
   });
 }
 
-export async function motor3dListProducts(): Promise<
-  {
-    url: string;
-    title?: string | null;
-    price_text?: string | null;
-    images: string[];
-    categories: string[];
-    tags: string[];
-    description_html?: string | null;
-    sku?: string | null;
-    raw: any;
-  }[]
-> {
-  return request(`${API_PREFIX}/admin/connectors/motor3d/products`);
+export async function motor3dListProducts(): Promise<Motor3DProduct[]> {
+  const data = await request<Motor3DProduct[]>(`${API_PREFIX}/admin/connectors/motor3d/products`);
+  return z.array(motor3dProductSchema).parse(data);
+}
+
+export function motor3dExportCsvUrl(projectId?: string) {
+  const url = new URL(`${API_PREFIX}/admin/connectors/motor3d/export-csv`);
+  if (projectId) url.searchParams.set('project_id', projectId);
+  return url.toString();
 }
 
 export async function updateDomainPolicy(

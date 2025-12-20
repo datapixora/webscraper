@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
@@ -28,8 +29,84 @@ from app.scraper import scrape_url_with_settings
 from app.services.proxy_config import get_httpx_proxy_dict
 from app.core.config import settings
 import logging
+from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_motor3d_product(html: str, url: str) -> Motor3DProduct:
+    soup = BeautifulSoup(html, "html.parser")
+
+    # Title
+    title = None
+    title_tag = soup.select_one("h1.product_title") or soup.select_one("h1.entry-title") or soup.find("h1")
+    if title_tag:
+        title = title_tag.get_text(" ", strip=True)
+
+    # Price
+    price_text = None
+    price_tag = soup.select_one(".summary .price") or soup.select_one(".price")
+    if price_tag:
+        price_text = price_tag.get_text(" ", strip=True)
+    else:
+        # Fallback: look for تومان near dynamic fields
+        for span in soup.select(".jet-listing-dynamic-field__content"):
+            txt = span.get_text(" ", strip=True)
+            if "تومان" in txt:
+                price_text = txt
+                break
+
+    # Specs / features
+    specs = [
+        s.get_text(" ", strip=True)
+        for s in soup.select(".jet-listing-dynamic-repeater__item span")
+        if s.get_text(strip=True)
+    ]
+
+    # Images
+    images = []
+    for img in soup.select(".woocommerce-product-gallery img"):
+        src = img.get("data-src") or img.get("src")
+        if src:
+            images.append(src)
+    if not images:
+        for img in soup.find_all("img"):
+            src = img.get("data-src") or img.get("src")
+            if not src:
+                continue
+            if "wp-content/uploads" in src and all(
+                ban not in src for ban in ["MainLogo.webp", "s.w.org", "zarinpal", "enamad"]
+            ):
+                images.append(src)
+
+    # Categories / tags
+    categories = [a.get_text(" ", strip=True) for a in soup.select(".posted_in a")]
+    tags = [a.get_text(" ", strip=True) for a in soup.select(".tagged_as a")]
+
+    description_html = None
+    desc_block = soup.select_one(".woocommerce-product-details__short-description") or soup.select_one(
+        ".product-content"
+    )
+    if desc_block:
+        description_html = desc_block.decode_contents()
+
+    sku = None
+    sku_tag = soup.select_one(".sku")
+    if sku_tag:
+        sku = sku_tag.get_text(strip=True)
+
+    return Motor3DProduct(
+        url=url,
+        title=title,
+        price_text=price_text,
+        images=images,
+        specs=specs,
+        categories=categories,
+        tags=tags,
+        description_html=description_html,
+        sku=sku,
+        raw={},
+    )
 
 router = APIRouter()
 
@@ -191,25 +268,27 @@ async def parse_product(payload: Motor3DParseRequest, db: AsyncSession = Depends
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
 
-    product = _parse_product(scrape["raw_html"])
-    product.url = str(payload.url)
+    product = _parse_motor3d_product(scrape["raw_html"], str(payload.url))
     product.raw = {
         "http_status": scrape.get("http_status"),
         "blocked": scrape.get("blocked"),
         "block_reason": scrape.get("block_reason"),
         "method": scrape.get("method"),
+        "specs": product.specs,
     }
 
     # persist
     await product_service.upsert(
         db,
         domain=urlparse(str(payload.url)).hostname or "",
+        project_id=payload.project_id if hasattr(payload, "project_id") else None,
         url=str(payload.url),
         title=product.title,
         price_text=product.price_text,
         images=product.images,
         categories=product.categories,
         tags=product.tags,
+        specs=product.specs,
         description_html=product.description_html,
         sku=product.sku,
         raw_json=product.raw,
@@ -220,7 +299,7 @@ async def parse_product(payload: Motor3DParseRequest, db: AsyncSession = Depends
 
 @router.get("/products", response_model=list[Motor3DProduct])
 async def list_products(db: AsyncSession = Depends(get_db)) -> list[Motor3DProduct]:
-    products = await product_service.list_by_domain(db, domain="motor3dmodel.ir", limit=200)
+    products = await product_service.list_by_domain(db, domain="motor3dmodel.ir", project_id=None, limit=200)
     output: list[Motor3DProduct] = []
     for p in products:
         output.append(
@@ -229,6 +308,7 @@ async def list_products(db: AsyncSession = Depends(get_db)) -> list[Motor3DProdu
                 title=p.title,
                 price_text=p.price_text,
                 images=p.images_json.get("items", []) if p.images_json else [],
+                specs=(p.raw_json or {}).get("specs", []),
                 categories=p.categories_json.get("items", []) if p.categories_json else [],
                 tags=p.tags_json.get("items", []) if p.tags_json else [],
                 description_html=p.description_html,
@@ -237,3 +317,33 @@ async def list_products(db: AsyncSession = Depends(get_db)) -> list[Motor3DProdu
             )
         )
     return output
+
+
+@router.get("/export-csv")
+async def export_csv(project_id: str | None = None, db: AsyncSession = Depends(get_db)):
+    products = await product_service.list_by_domain(
+        db, domain="motor3dmodel.ir", project_id=project_id, limit=5000
+    )
+    import csv
+    import io
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["url", "title", "price_text", "specs", "images_first", "images_all"])
+    for p in products:
+        images = p.images_json.get("items", []) if p.images_json else []
+        specs = (p.raw_json or {}).get("specs", [])
+        writer.writerow(
+            [
+                p.url,
+                p.title or "",
+                p.price_text or "",
+                " | ".join(specs),
+                images[0] if images else "",
+                " | ".join(images),
+            ]
+        )
+
+    output.seek(0)
+    headers = {"Content-Disposition": "attachment; filename=motor3d_products.csv"}
+    return StreamingResponse(iter([output.getvalue()]), media_type="text/csv", headers=headers)

@@ -102,7 +102,7 @@ async def _discover_with_client(
         product_urls = [loc for loc in locs if _is_product_url(loc, domain) and "/product/" in loc]
         logger.info(
             "motor3d_discover_product_sitemap",
-            extra={"sitemap": sm, "locs": len(locs), "products": len(product_urls)},
+            extra={"sitemap": str(sm), "locs": len(locs), "products": len(product_urls)},
         )
         urls.extend(product_urls)
         if delay > 0:

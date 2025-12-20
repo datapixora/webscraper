@@ -1,17 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   motor3dCreateJobs,
   motor3dDiscover,
   motor3dListProducts,
   motor3dParse,
+  getProjects,
+  createProject,
+  Project,
 } from "@/lib/api-client";
 
 export default function Motor3DPage() {
   const [sitemapUrl, setSitemapUrl] = useState("https://motor3dmodel.ir/wp-sitemap.xml");
   const [urlPrefix, setUrlPrefix] = useState("https://motor3dmodel.ir/product/");
   const [urls, setUrls] = useState<string[]>([]);
+  const [selectedUrls, setSelectedUrls] = useState<string[]>([]);
   const [sampleUrls, setSampleUrls] = useState<string[]>([]);
   const [discovering, setDiscovering] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -21,8 +25,26 @@ export default function Motor3DPage() {
   const [parseUrl, setParseUrl] = useState("");
   const [parseResult, setParseResult] = useState<any>(null);
   const [projectId, setProjectId] = useState("");
+  const [projects, setProjects] = useState<Project[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadProjects = async () => {
+      try {
+        const data = await getProjects();
+        setProjects(data);
+        const defaultProj =
+          data.find((p) => p.name?.toLowerCase().includes("motor3d")) ||
+          data.find((p) => (p.allowed_domains || []).includes("motor3dmodel.ir")) ||
+          data[0];
+        if (defaultProj) setProjectId(defaultProj.id);
+      } catch (e: any) {
+        setError(e?.message || "Failed to load projects");
+      }
+    };
+    loadProjects();
+  }, []);
 
   const handleDiscover = async () => {
     setDiscovering(true);
@@ -30,6 +52,7 @@ export default function Motor3DPage() {
     try {
       const res = await motor3dDiscover({ sitemap_url: sitemapUrl, url_prefix: urlPrefix });
       setUrls(res.urls || []);
+      setSelectedUrls(res.urls || []);
       setSampleUrls(res.sample_urls || res.urls || []);
       setFoundCount(res.count);
       setLastRun(new Date());
@@ -42,13 +65,18 @@ export default function Motor3DPage() {
 
   const handleCreateJobs = async () => {
     if (!projectId) {
-      setError("Set a project id");
+      setError("Select a project first");
+      return;
+    }
+    const toCreate = selectedUrls.length > 0 ? selectedUrls : urls;
+    if (toCreate.length === 0) {
+      setError("No URLs to create jobs");
       return;
     }
     setCreating(true);
     setError(null);
     try {
-      const res = await motor3dCreateJobs({ project_id: projectId, urls });
+      const res = await motor3dCreateJobs({ project_id: projectId, urls: toCreate });
       setError(`Created ${res.created}, Rejected ${res.rejected.length}`);
     } catch (e: any) {
       setError(e?.message || "Create jobs failed");
@@ -61,7 +89,13 @@ export default function Motor3DPage() {
     setParsing(true);
     setError(null);
     try {
-      const res = await motor3dParse({ url: parseUrl });
+      const target = parseUrl || selectedUrls[0] || urls[0];
+      if (!target) {
+        setError("Pick a URL to parse");
+        setParsing(false);
+        return;
+      }
+      const res = await motor3dParse({ url: target, project_id: projectId });
       setParseResult(res);
     } catch (e: any) {
       setError(e?.message || "Parse failed");
@@ -79,29 +113,51 @@ export default function Motor3DPage() {
     }
   };
 
+  const handleCreateProject = async () => {
+    setError(null);
+    try {
+      const proj = await createProject({ name: "motor3d", description: "Motor3D products" });
+      setProjects((prev) => [proj, ...prev]);
+      setProjectId(proj.id);
+    } catch (e: any) {
+      setError(e?.message || "Create project failed (maybe already exists)");
+    }
+  };
+
+  const toggleSelect = (url: string) => {
+    setSelectedUrls((prev) => (prev.includes(url) ? prev.filter((u) => u !== url) : [...prev, url]));
+  };
+
+  const allSelected = useMemo(() => urls.length > 0 && selectedUrls.length === urls.length, [urls, selectedUrls]);
+
+  const toggleSelectAll = () => {
+    if (allSelected) setSelectedUrls([]);
+    else setSelectedUrls(urls);
+  };
+
   return (
     <div className="space-y-6 p-4">
       <div>
         <h1 className="text-2xl font-semibold text-white">Motor3D Products</h1>
         <p className="text-sm text-slate-300">
-          Discover product URLs, create scrape jobs, and parse sample pages.
+          Discover product URLs, create scrape jobs, parse sample pages, and export CSV.
         </p>
       </div>
 
       <section className="rounded-lg border border-white/10 bg-white/5 p-4 space-y-3">
         <h2 className="text-lg font-semibold text-white">1) Discover product URLs</h2>
         <div className="grid gap-2 md:grid-cols-2">
-          <input
-            className="rounded-md border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white"
-            value={sitemapUrl}
-            onChange={(e) => setSitemapUrl(e.target.value)}
-          />
-          <input
-            className="rounded-md border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white"
-            value={urlPrefix}
-            onChange={(e) => setUrlPrefix(e.target.value)}
-          />
-        </div>
+            <input
+              className="rounded-md border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white"
+              value={sitemapUrl}
+              onChange={(e) => setSitemapUrl(e.target.value)}
+            />
+            <input
+              className="rounded-md border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white"
+              value={urlPrefix}
+              onChange={(e) => setUrlPrefix(e.target.value)}
+            />
+          </div>
         <button
           onClick={handleDiscover}
           disabled={discovering}
@@ -116,9 +172,15 @@ export default function Motor3DPage() {
           </p>
         )}
         {sampleUrls.length > 0 && (
-          <div className="max-h-48 overflow-auto rounded-md border border-white/10 bg-slate-900/80 p-2 text-xs text-slate-200">
-            {sampleUrls.slice(0, 50).map((u) => (
-              <div key={u}>{u}</div>
+          <div className="max-h-60 overflow-auto rounded-md border border-white/10 bg-slate-900/80 p-2 text-xs text-slate-200 space-y-1">
+            <label className="flex items-center gap-2 text-xs text-emerald-200">
+              <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} /> Select all ({selectedUrls.length})
+            </label>
+            {urls.map((u) => (
+              <label key={u} className="flex items-center gap-2">
+                <input type="checkbox" checked={selectedUrls.includes(u)} onChange={() => toggleSelect(u)} />
+                <span className="break-all">{u}</span>
+              </label>
             ))}
             {urls.length > 50 && <div>... (+{urls.length - 50} more)</div>}
           </div>
@@ -127,15 +189,31 @@ export default function Motor3DPage() {
 
       <section className="rounded-lg border border-white/10 bg-white/5 p-4 space-y-3">
         <h2 className="text-lg font-semibold text-white">2) Create jobs</h2>
-        <input
-          className="w-full rounded-md border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white"
-          placeholder="Project ID"
-          value={projectId}
-          onChange={(e) => setProjectId(e.target.value)}
-        />
+        <div className="flex flex-col gap-2">
+          <label className="text-sm text-slate-200">Project</label>
+          <select
+            className="w-full rounded-md border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white"
+            value={projectId}
+            onChange={(e) => setProjectId(e.target.value)}
+          >
+            <option value="">Select project</option>
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            className="w-fit rounded-md border border-white/10 bg-white/5 px-3 py-1 text-sm text-emerald-100 hover:border-emerald-300/60"
+            onClick={handleCreateProject}
+          >
+            Create motor3d project
+          </button>
+        </div>
         <button
           onClick={handleCreateJobs}
-          disabled={creating || urls.length === 0}
+          disabled={creating || urls.length === 0 || !projectId}
           className="rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
         >
           {creating ? "Creating..." : "Create jobs for discovered URLs"}
@@ -144,15 +222,24 @@ export default function Motor3DPage() {
 
       <section className="rounded-lg border border-white/10 bg-white/5 p-4 space-y-3">
         <h2 className="text-lg font-semibold text-white">3) Parse sample URL</h2>
-        <input
-          className="w-full rounded-md border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white"
-          placeholder="https://motor3dmodel.ir/product/..."
-          value={parseUrl}
-          onChange={(e) => setParseUrl(e.target.value)}
-        />
+        <div className="space-y-2">
+          <label className="text-sm text-slate-200">Pick a discovered URL</label>
+          <select
+            className="w-full rounded-md border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white"
+            value={parseUrl || selectedUrls[0] || urls[0] || ""}
+            onChange={(e) => setParseUrl(e.target.value)}
+          >
+            <option value="">Choose URL</option>
+            {urls.slice(0, 200).map((u) => (
+              <option key={u} value={u}>
+                {u}
+              </option>
+            ))}
+          </select>
+        </div>
         <button
           onClick={handleParse}
-          disabled={parsing || !parseUrl}
+          disabled={parsing || (!parseUrl && urls.length === 0)}
           className="rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
         >
           {parsing ? "Parsing..." : "Parse"}
@@ -165,14 +252,27 @@ export default function Motor3DPage() {
       </section>
 
       <section className="rounded-lg border border-white/10 bg-white/5 p-4 space-y-3">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           <h2 className="text-lg font-semibold text-white">Parsed products (latest)</h2>
-          <button
-            onClick={loadProducts}
-            className="rounded-md border border-white/10 bg-white/5 px-3 py-1 text-sm text-slate-100 hover:border-emerald-300/60"
-          >
-            Refresh
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={loadProducts}
+              className="rounded-md border border-white/10 bg-white/5 px-3 py-1 text-sm text-slate-100 hover:border-emerald-300/60"
+            >
+              Refresh
+            </button>
+            <button
+              onClick={() =>
+                window.open(
+                  `/api/v1/admin/connectors/motor3d/export-csv${projectId ? `?project_id=${projectId}` : ""}`,
+                  "_blank",
+                )
+              }
+              className="rounded-md border border-emerald-300/50 bg-emerald-500/20 px-3 py-1 text-sm text-emerald-100 hover:border-emerald-200"
+            >
+              Export CSV
+            </button>
+          </div>
         </div>
         {products.length === 0 && <p className="text-sm text-slate-300">None yet.</p>}
         {products.length > 0 && (
@@ -183,7 +283,7 @@ export default function Motor3DPage() {
                   <th className="px-2 py-1 text-left">Title</th>
                   <th className="px-2 py-1 text-left">Price</th>
                   <th className="px-2 py-1 text-left">URL</th>
-                  <th className="px-2 py-1 text-left">Tags</th>
+                  <th className="px-2 py-1 text-left">Specs</th>
                 </tr>
               </thead>
               <tbody>
@@ -192,7 +292,7 @@ export default function Motor3DPage() {
                     <td className="px-2 py-1 text-white">{p.title}</td>
                     <td className="px-2 py-1 text-slate-200">{p.price_text}</td>
                     <td className="px-2 py-1 text-emerald-200 break-all">{p.url}</td>
-                    <td className="px-2 py-1 text-slate-200">{p.tags?.join(", ")}</td>
+                    <td className="px-2 py-1 text-slate-200">{(p.specs || []).join(" | ")}</td>
                   </tr>
                 ))}
               </tbody>

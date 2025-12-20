@@ -18,6 +18,7 @@
 - Add CLI/script smoke for Motor3D sitemap discover (`python -m scripts.test_motor3d_discover`) and assert non-zero URLs.
 - Add logs/metrics for Motor3D product sitemap discovery (counts of sitemaps/urls) in CI smoke.
 - Fix motor3d discover logging + pydantic Url cast (done).
+- Finalize Motor3D UX (auto project selection, parse preview dropdown, CSV export) — done.
 
 ## Proxy & Scraping (Recently Implemented)
 ✅ **Admin Proxy Settings UI + Backend Storage**

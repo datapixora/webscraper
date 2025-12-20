@@ -32,6 +32,7 @@ class Motor3DCreateJobsResponse(BaseModel):
 class Motor3DParseRequest(BaseModel):
     url: HttpUrl
     method: Optional[Literal["auto", "http", "playwright"]] = None
+    project_id: Optional[str] = None
 
 
 class Motor3DProduct(BaseModel):
@@ -39,6 +40,7 @@ class Motor3DProduct(BaseModel):
     title: Optional[str] = None
     price_text: Optional[str] = None
     images: list[str] = []
+    specs: list[str] = []
     categories: list[str] = []
     tags: list[str] = []
     description_html: Optional[str] = None

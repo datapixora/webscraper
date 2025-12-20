@@ -14,12 +14,14 @@ class ProductService:
         db: AsyncSession,
         *,
         domain: str,
+        project_id: str | None,
         url: str,
         title: Optional[str],
         price_text: Optional[str],
         images: list[str],
         categories: list[str],
         tags: list[str],
+        specs: list[str],
         description_html: Optional[str],
         sku: Optional[str],
         raw_json: dict[str, Any] | None = None,
@@ -35,9 +37,11 @@ class ProductService:
             existing.description_html = description_html
             existing.sku = sku
             existing.raw_json = raw_json
+            existing.project_id = project_id
             product = existing
         else:
             product = Product(
+                project_id=project_id,
                 domain=domain,
                 url=url,
                 title=title,
@@ -55,14 +59,13 @@ class ProductService:
         await db.refresh(product)
         return product
 
-    async def list_by_domain(self, db: AsyncSession, domain: str, limit: int = 100, offset: int = 0) -> list[Product]:
-        stmt = (
-            select(Product)
-            .where(Product.domain == domain)
-            .order_by(Product.created_at.desc())
-            .limit(limit)
-            .offset(offset)
-        )
+    async def list_by_domain(
+        self, db: AsyncSession, domain: str, project_id: str | None = None, limit: int = 1000, offset: int = 0
+    ) -> list[Product]:
+        stmt = select(Product).where(Product.domain == domain)
+        if project_id:
+            stmt = stmt.where(Product.project_id == project_id)
+        stmt = stmt.order_by(Product.created_at.desc()).limit(limit).offset(offset)
         rows = await db.execute(stmt)
         return list(rows.scalars().all())
 
