@@ -23,12 +23,18 @@ async def _fetch_with_retry(client: httpx.AsyncClient, url: str, retries: int = 
     last_exc: Exception | None = None
     for attempt in range(retries + 1):
         try:
-            resp = await client.get(url)
+            url_str = str(url)
+            resp = await client.get(url_str)
             resp.raise_for_status()
             return resp
         except Exception as exc:  # noqa: BLE001
             last_exc = exc
-            logger.warning("motor3d_fetch_failed", url=url, attempt=attempt + 1, error=str(exc))
+            logger.warning(
+                "motor3d_fetch_failed url=%s attempt=%s error=%s",
+                str(url),
+                attempt + 1,
+                str(exc),
+            )
             await asyncio.sleep(0.5)
     raise last_exc  # type: ignore
 
@@ -77,7 +83,7 @@ async def _discover_with_client(
     product_sitemaps_seen: set[str] = set()
 
     while to_visit and len(seen) < max_urls:
-        current = to_visit.pop()
+        current = str(to_visit.pop())
         resp = await _fetch_with_retry(client, current)
         xml_text = _ensure_xml_response(resp)
         locs = _parse_locs(xml_text)
@@ -143,10 +149,16 @@ async def discover_product_urls(
             )
         except ValueError as ve:
             errors.append(str(ve))
-            logger.warning("motor3d_discover_non_xml", use_proxy=proxy_mode, error=str(ve))
+            logger.warning(
+                "motor3d_discover_non_xml use_proxy=%s error=%s", proxy_mode, str(ve)
+            )
         except Exception as exc:  # noqa: BLE001
             errors.append(str(exc))
-            logger.warning("motor3d_discover_failed_attempt", use_proxy=proxy_mode, error=str(exc))
+            logger.warning(
+                "motor3d_discover_failed_attempt use_proxy=%s error=%s",
+                proxy_mode,
+                str(exc),
+            )
         finally:
             await client.aclose()
 
