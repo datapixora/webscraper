@@ -46,3 +46,16 @@ class Motor3DProduct(BaseModel):
     description_html: Optional[str] = None
     sku: Optional[str] = None
     raw: dict = {}
+
+
+class Motor3DRunRequest(BaseModel):
+    project_id: str
+    max_urls: int = Field(default=2000, ge=1, le=20000)
+    domain: str | None = "motor3dmodel.ir"
+
+
+class Motor3DRunResponse(BaseModel):
+    count: int
+    sample_urls: list[str]
+    job_ids: list[str]
+    rejected: list[dict[str, str]]

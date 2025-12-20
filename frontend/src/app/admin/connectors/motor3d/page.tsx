@@ -9,6 +9,9 @@ import {
   getProjects,
   createProject,
   Project,
+  listDomainPolicies,
+  Motor3DProduct,
+  motor3dRunAll,
 } from "@/lib/api-client";
 
 export default function Motor3DPage() {
@@ -27,6 +30,7 @@ export default function Motor3DPage() {
   const [projectId, setProjectId] = useState("");
   const [projects, setProjects] = useState<Project[]>([]);
   const [products, setProducts] = useState<any[]>([]);
+  const [policy, setPolicy] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -44,6 +48,20 @@ export default function Motor3DPage() {
       }
     };
     loadProjects();
+  }, []);
+
+  const loadPolicy = async () => {
+    try {
+      const policies = await listDomainPolicies();
+      const p = policies.find((p) => p.domain === "motor3dmodel.ir");
+      setPolicy(p || null);
+    } catch (e: any) {
+      setError(e?.message || "Failed to load policy");
+    }
+  };
+
+  useEffect(() => {
+    loadPolicy();
   }, []);
 
   const handleDiscover = async () => {
@@ -143,6 +161,31 @@ export default function Motor3DPage() {
           Discover product URLs, create scrape jobs, parse sample pages, and export CSV.
         </p>
       </div>
+      {policy && (
+        <section className="rounded-lg border border-emerald-300/30 bg-emerald-500/10 p-4 space-y-2">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-white">Policy: motor3dmodel.ir</h2>
+            <div className="flex gap-2">
+              <button
+                onClick={loadPolicy}
+                className="rounded-md border border-white/20 bg-white/5 px-3 py-1 text-xs text-slate-100 hover:border-emerald-300/60"
+              >
+                Reload policy
+              </button>
+              <a
+                className="rounded-md border border-emerald-300/50 bg-emerald-500/20 px-3 py-1 text-xs text-emerald-100 hover:border-emerald-200"
+                href="/admin/policies?domain=motor3dmodel.ir"
+              >
+                Edit Policies
+              </a>
+            </div>
+          </div>
+          <p className="text-sm text-slate-200">
+            method: {policy.method} · proxy: {policy.use_proxy ? "on" : "off"} · delay: {policy.request_delay_ms} ms ·
+            concurrency: {policy.max_concurrency} · UA: {policy.user_agent || "default"}
+          </p>
+        </section>
+      )}
 
       <section className="rounded-lg border border-white/10 bg-white/5 p-4 space-y-3">
         <h2 className="text-lg font-semibold text-white">1) Discover product URLs</h2>
@@ -221,28 +264,31 @@ export default function Motor3DPage() {
       </section>
 
       <section className="rounded-lg border border-white/10 bg-white/5 p-4 space-y-3">
-        <h2 className="text-lg font-semibold text-white">3) Parse sample URL</h2>
-        <div className="space-y-2">
-          <label className="text-sm text-slate-200">Pick a discovered URL</label>
-          <select
-            className="w-full rounded-md border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white"
-            value={parseUrl || selectedUrls[0] || urls[0] || ""}
-            onChange={(e) => setParseUrl(e.target.value)}
-          >
-            <option value="">Choose URL</option>
-            {urls.slice(0, 200).map((u) => (
-              <option key={u} value={u}>
-                {u}
-              </option>
-            ))}
-          </select>
-        </div>
+        <h2 className="text-lg font-semibold text-white">3) Run all (discover → jobs → scrape)</h2>
         <button
-          onClick={handleParse}
-          disabled={parsing || (!parseUrl && urls.length === 0)}
+          onClick={async () => {
+            if (!projectId) {
+              setError("Select a project first");
+              return;
+            }
+            setParsing(true);
+            setError(null);
+            try {
+              const res = await motor3dRunAll({ project_id: projectId, max_urls: 2000 });
+              setFoundCount(res.count);
+              setSampleUrls(res.sample_urls || []);
+              setUrls(res.sample_urls || []);
+              setParseResult(res);
+            } catch (e: any) {
+              setError(e?.message || "Run all failed");
+            } finally {
+              setParsing(false);
+            }
+          }}
+          disabled={parsing}
           className="rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
         >
-          {parsing ? "Parsing..." : "Parse"}
+          {parsing ? "Running..." : "Run all (discover + create jobs + scrape)"}
         </button>
         {parseResult && (
           <pre className="max-h-64 overflow-auto rounded-md border border-white/10 bg-slate-900/80 p-3 text-xs text-slate-200">

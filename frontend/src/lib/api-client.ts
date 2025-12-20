@@ -413,6 +413,16 @@ export function motor3dExportCsvUrl(projectId?: string) {
   return url.toString();
 }
 
+export async function motor3dRunAll(input: { project_id: string; max_urls?: number }) {
+  return request<{ count: number; sample_urls: string[]; job_ids: string[] }>(
+    `${API_PREFIX}/admin/connectors/motor3d/run`,
+    {
+      method: 'POST',
+      body: JSON.stringify(input),
+    },
+  );
+}
+
 export async function updateDomainPolicy(
   id: string,
   input: {

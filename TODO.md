@@ -19,6 +19,7 @@
 - Add logs/metrics for Motor3D product sitemap discovery (counts of sitemaps/urls) in CI smoke.
 - Fix motor3d discover logging + pydantic Url cast (done).
 - Finalize Motor3D UX (auto project selection, parse preview dropdown, CSV export) — done.
+- Motor3D: Run all workflow + policy panel + queue jobs respecting domain policy — done.
 
 ## Proxy & Scraping (Recently Implemented)
 ✅ **Admin Proxy Settings UI + Backend Storage**
