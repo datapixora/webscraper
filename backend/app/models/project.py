@@ -13,3 +13,6 @@ class Project(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     extraction_schema: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     jobs: Mapped[list["Job"]] = relationship("Job", back_populates="project", cascade="all, delete")
+    exports: Mapped[list["Export"]] = relationship(
+        "Export", back_populates="project", cascade="all, delete-orphan"
+    )

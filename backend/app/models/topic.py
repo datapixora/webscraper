@@ -33,6 +33,10 @@ class Topic(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     urls: Mapped[list["TopicURL"]] = relationship(
         "TopicURL", back_populates="topic", cascade="all, delete-orphan"
     )
+    jobs: Mapped[list["Job"]] = relationship("Job", back_populates="topic", cascade="all, delete")
+    exports: Mapped[list["Export"]] = relationship(
+        "Export", back_populates="topic", cascade="all, delete-orphan"
+    )
 
 
 __all__ = ["Topic", "TopicStatus"]
