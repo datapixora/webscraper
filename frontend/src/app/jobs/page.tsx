@@ -295,6 +295,10 @@ function NewJobModal({ projects, onClose }: { projects: ProjectOption[]; onClose
       setFeedback('Pick a project and enter at least one URL.');
       return;
     }
+    if (!createBatchJobsMutation) {
+      setFeedback('Job creation is unavailable right now. Please retry in a moment.');
+      return;
+    }
     const res = await createBatchJobsMutation.mutateAsync({
       project_id: projectId,
       urls: urlList,
@@ -349,8 +353,11 @@ function NewJobModal({ projects, onClose }: { projects: ProjectOption[]; onClose
           </label>
         </div>
         {feedback && <p className="mt-2 text-xs text-emerald-300">{feedback}</p>}
-        {createBatchJobsMutation.isError && (
-          <p className="mt-2 text-xs text-amber-300">{(createBatchJobsMutation.error as Error).message}</p>
+        {createBatchJobsMutation?.isError && (
+          <p className="mt-2 text-xs text-amber-300">
+            {(createBatchJobsMutation?.error as Error | undefined)?.message ??
+              'Failed to create jobs. Please retry.'}
+          </p>
         )}
         <div className="mt-4 flex justify-end gap-2">
           <button
@@ -362,9 +369,9 @@ function NewJobModal({ projects, onClose }: { projects: ProjectOption[]; onClose
           <button
             className="rounded-md border border-emerald-300/50 bg-emerald-500/20 px-3 py-2 text-sm font-semibold text-emerald-100 hover:border-emerald-200 hover:bg-emerald-500/30 disabled:opacity-60"
             onClick={submit}
-            disabled={createBatchJobsMutation.isPending}
+            disabled={createBatchJobsMutation?.isPending}
           >
-            {createBatchJobsMutation.isPending ? 'Creating...' : 'Create jobs'}
+            {createBatchJobsMutation?.isPending ? 'Creating...' : 'Create jobs'}
           </button>
         </div>
       </div>

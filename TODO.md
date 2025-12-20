@@ -11,6 +11,7 @@
 - Capture backend + frontend logs in docs/troubleshooting for common Windows/Docker Desktop issues.
 - Add UI toast for job creation/logs when Celery enqueues to help debugging stuck jobs.
 - Add admin domain policy CRUD UI/CRUD tests and wire policies into scraper runtime for per-domain throttling.
+- Add react-query tests covering jobs page mutations (create batch jobs) to prevent undefined mutation crashes.
 
 ## Proxy & Scraping (Recently Implemented)
 ✅ **Admin Proxy Settings UI + Backend Storage**
