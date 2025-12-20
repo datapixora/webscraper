@@ -14,9 +14,10 @@ from app.services.proxy_config import get_httpx_proxy_dict
 logger = logging.getLogger(__name__)
 
 
-def _parse_locs(xml_text: str) -> list[str]:
-    tree = ET.fromstring(xml_text)
-    return [loc.text.strip() for loc in tree.iter("{*}loc") if loc.text]
+def _xml_locs(xml_text: str) -> list[str]:
+    root = ET.fromstring(xml_text)
+    ns = {"sm": "http://www.sitemaps.org/schemas/sitemap/0.9"}
+    return [el.text.strip() for el in root.findall(".//sm:loc", ns) if el.text and el.text.strip()]
 
 
 async def _fetch_with_retry(client: httpx.AsyncClient, url: str, retries: int = 2) -> httpx.Response:
@@ -78,48 +79,49 @@ async def _discover_with_client(
     delay: float,
     max_urls: int,
 ) -> list[str]:
-    seen: set[str] = set()
-    to_visit = [sitemap_url]
-    product_sitemaps_seen: set[str] = set()
+    # Fetch index sitemap
+    resp = await _fetch_with_retry(client, str(sitemap_url))
+    xml_text = _ensure_xml_response(resp)
+    index_locs = _xml_locs(xml_text)
+    product_sitemaps = [
+        loc for loc in index_locs if "wp-sitemap-posts-product-" in loc.lower() and loc.lower().endswith(".xml")
+    ]
+    logger.info(
+        "motor3d_discover_index",
+        extra={"count_locs": len(index_locs), "product_sitemaps": len(product_sitemaps)},
+    )
+    if not product_sitemaps:
+        preview = xml_text[:200]
+        raise ValueError(f"No product sitemap found in wp-sitemap.xml; first200={preview}")
 
-    while to_visit and len(seen) < max_urls:
-        current = str(to_visit.pop())
-        resp = await _fetch_with_retry(client, current)
-        xml_text = _ensure_xml_response(resp)
-        locs = _parse_locs(xml_text)
-
-        product_sitemaps: list[str] = []
-        product_urls: list[str] = []
-        for loc in locs:
-            if loc.endswith(".xml"):
-                if _is_product_sitemap(loc):
-                    product_sitemaps.append(loc)
-            elif _is_product_url(loc, domain):
-                product_urls.append(loc)
-
-        for loc in product_urls:
-            if len(seen) >= max_urls:
-                break
-            if loc.startswith(url_prefix) or _is_product_url(loc, domain):
-                seen.add(loc)
-
-        for sm in product_sitemaps:
-            if sm not in product_sitemaps_seen:
-                product_sitemaps_seen.add(sm)
-                to_visit.append(sm)
-
-        if delay > 0 and to_visit:
+    urls: list[str] = []
+    for sm in product_sitemaps:
+        resp_sm = await _fetch_with_retry(client, str(sm))
+        sm_text = _ensure_xml_response(resp_sm)
+        locs = _xml_locs(sm_text)
+        product_urls = [loc for loc in locs if _is_product_url(loc, domain) and "/product/" in loc]
+        logger.info(
+            "motor3d_discover_product_sitemap",
+            extra={"sitemap": sm, "locs": len(locs), "products": len(product_urls)},
+        )
+        urls.extend(product_urls)
+        if delay > 0:
             await asyncio.sleep(delay)
+        if len(urls) >= max_urls:
+            break
+
+    urls = list(dict.fromkeys(urls))  # preserve order, dedupe
+    if not urls:
+        preview = product_sitemaps[0] if product_sitemaps else ""
+        raise ValueError(
+            f"Product sitemap fetched but 0 product URLs parsed. product_sitemaps={product_sitemaps} preview={preview}"
+        )
 
     logger.info(
         "motor3d_discover_finished",
-        domain=domain,
-        sitemap_url=sitemap_url,
-        product_sitemaps=len(product_sitemaps_seen),
-        urls=len(seen),
-        max_urls=max_urls,
+        extra={"domain": domain, "product_sitemaps": len(product_sitemaps), "urls": len(urls), "max_urls": max_urls},
     )
-    return sorted(seen)
+    return urls[:max_urls]
 
 
 async def discover_product_urls(

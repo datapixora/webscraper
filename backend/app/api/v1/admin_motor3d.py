@@ -88,7 +88,7 @@ async def discover_products(payload: Motor3DDiscoverRequest, db: AsyncSession = 
         logger.exception("motor3d discover failed", extra={"domain": base})
         raise HTTPException(
             status_code=status.HTTP_424_FAILED_DEPENDENCY,
-            detail="Expected XML sitemap but got HTML (likely Cloudflare/proxy).",
+            detail=str(ve)[:200],
         ) from ve
     except Exception as exc:  # noqa: BLE001
         logger.exception("motor3d discover failed", extra={"domain": base})
