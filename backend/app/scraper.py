@@ -402,12 +402,12 @@ async def scrape_url_with_settings(
         except Exception as exc:
             if attempt == max_retries:
                 # Last attempt failed, raise
-                logger.exception("scrape_failed_all_retries", url=url, attempts=max_retries + 1)
+                logger.exception(f"Scrape failed all retries for {url}, attempts: {max_retries + 1}")
                 raise
             else:
                 # Retry
                 clear_sticky_session(job_id=job_id)
-                logger.warning("scrape_attempt_failed_retrying", url=url, attempt=attempt + 1, error=str(exc))
+                logger.warning(f"Scrape attempt failed, retrying: {url}, attempt: {attempt + 1}, error: {exc}")
                 continue
 
     structured = extract_with_schema(raw_html, extraction_schema)
@@ -444,6 +444,15 @@ async def _fetch_playwright_with_proxy(
     block_resources: bool = True,
 ) -> str:
     """Fetch URL with Playwright using provided proxy configuration."""
+    # Log proxy config for debugging
+    if proxy_config:
+        masked_config = {
+            "server": proxy_config.get("server"),
+            "username": "***" if proxy_config.get("username") else None,
+            "password": "***" if proxy_config.get("password") else None,
+        }
+        structured_logger.debug("playwright_proxy_config", config=masked_config)
+
     BLOCKED_RESOURCE_TYPES = ["image", "media", "font", "stylesheet"]
     BLOCKED_URL_PATTERNS = [
         r".*\.(jpg|jpeg|png|gif|webp|svg|ico)$",

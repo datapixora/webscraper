@@ -1,7 +1,17 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nAdd BidFax connector for auction vehicle scraping\n\nImplements dedicated BidFax connector with full control:\n- Multi-page discovery \\(10 listings per page\\)\n- Automatic pagination support \\(discovers across multiple pages\\)\n- Live progress tracking during discovery\n- Customizable max URLs \\(including \"all\" option via UI\\)\n- Complete vehicle data extraction \\(price, VIN, auction, condition, damage, mileage, etc.\\)\n- CSV export functionality\n- Test/preview parsing before job creation\n\nBackend:\n- backend/app/services/bidfax_connector.py - Dedicated service with discovery, parsing, CSV export\n- backend/app/api/v1/admin_bidfax.py - API endpoints for discover, create-jobs, parse, export\n- backend/app/api/router.py - Register BidFax router at /admin/connectors/bidfax\n\nFrontend:\n- frontend/src/app/admin/connectors/bidfax/page.tsx - Full UI with discovery, selection, job creation\n- frontend/src/lib/api-client.ts - BidFax API client functions\n\nFeatures:\n- Discover URLs from category pages with pagination\n- Shows found count and pages scraped\n- Select individual URLs or select all\n- Create jobs for selected URLs\n- Parse single URL for preview \\(no job created\\)\n- View scraped vehicles table\n- Export all to CSV\n- Domain policy integration \\(shows bidfax.info policy\\)\n\nAccess: /admin/connectors/bidfax\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push:*)",
+      "Bash(docker-compose restart:*)",
+      "Bash(docker-compose logs:*)",
+      "Bash(curl:*)",
+      "Bash(docker-compose ps:*)",
+      "Bash(test:*)",
+      "Bash(docker-compose exec -T api curl -x http://smart-y4zqhk95kbx9:zZXp5bSYelyjjT7H@proxy.smartproxy.net:3120 https://api.ipify.org?format=json --connect-timeout 10)",
+      "Bash(python3:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nAdd proxy debugging and improve BidFax configuration\n\nDebugging improvements:\n- Add debug logging for Playwright proxy configuration\n- Add proxy URL parse logging in proxy_manager\n- Log proxy server and username length for troubleshooting\n\nSmartProxy configuration:\n- Configured SmartProxy credentials \\(proxy.smartproxy.net:3120\\)\n- Proxy connection successful from Docker containers\n- Both curl and Docker container can reach proxy\n\nBidFax domain policy improvements:\n- Updated user agent to full Chrome string\n- Increased request delay to 3000ms\n- Enabled proxy usage\n\nCurrent status:\n- Proxy connects successfully ✓\n- Requests reach BidFax through proxy ✓\n- BidFax blocks with Cloudflare protection \\(requires anti-detection\\)\n\nFiles modified:\n- backend/app/scraper.py - Added Playwright proxy debug logging\n- backend/app/services/proxy_manager.py - Added proxy URL parse logging\n- Domain policy updated via API for en.bidfax.info\n\nNext: Implement Cloudflare bypass strategies\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
     ]
   }
 }

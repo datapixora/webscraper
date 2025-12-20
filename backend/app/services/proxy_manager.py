@@ -210,7 +210,13 @@ async def get_proxy_for_request(
             "username": unquote(username),
             "password": unquote(password),
         }
+        logger.debug(
+            "playwright_proxy_built",
+            server=playwright_proxy["server"],
+            username_length=len(playwright_proxy["username"]),
+        )
     else:
+        logger.warning("proxy_url_parse_failed", proxy_url=proxy_url)
         playwright_proxy = None
 
     return httpx_proxy, playwright_proxy

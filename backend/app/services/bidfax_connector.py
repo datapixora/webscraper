@@ -212,8 +212,8 @@ class BidFaxConnector:
                     "bidfax_page_error",
                     page_num=page_num,
                     error=str(exc),
-                    exc_info=exc,
                 )
+                logger.exception("BidFax page scraping failed", exc_info=exc)
                 break
 
         # Trim to max_urls if specified
@@ -332,7 +332,8 @@ class BidFaxConnector:
             return BidFaxVehicle(data)
 
         except Exception as exc:
-            structured_logger.error("bidfax_parse_error", url=url, error=str(exc), exc_info=exc)
+            structured_logger.error("bidfax_parse_error", error=str(exc))
+            logger.exception(f"Failed to parse BidFax listing: {url}")
             return None
 
     @staticmethod
@@ -361,14 +362,16 @@ class BidFaxConnector:
             )
 
             if result.get("blocked"):
-                structured_logger.error("bidfax_vehicle_blocked", url=url)
+                structured_logger.error("bidfax_vehicle_blocked")
+                logger.warning(f"BidFax vehicle page blocked: {url}")
                 return None
 
             vehicle = BidFaxConnector._parse_vehicle_listing(result["raw_html"], url)
             return vehicle.to_dict() if vehicle else None
 
         except Exception as exc:
-            structured_logger.error("bidfax_vehicle_parse_error", url=url, error=str(exc))
+            structured_logger.error("bidfax_vehicle_parse_error", error=str(exc))
+            logger.exception(f"Failed to parse BidFax vehicle: {url}")
             return None
 
     @staticmethod
