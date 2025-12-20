@@ -11,6 +11,7 @@ class Motor3DDiscoverRequest(BaseModel):
 
 class Motor3DDiscoverResponse(BaseModel):
     count: int
+    sample_urls: list[str]
     urls: list[str]
 
 

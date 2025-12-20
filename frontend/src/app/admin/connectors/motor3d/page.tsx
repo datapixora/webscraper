@@ -15,6 +15,8 @@ export default function Motor3DPage() {
   const [discovering, setDiscovering] = useState(false);
   const [creating, setCreating] = useState(false);
   const [parsing, setParsing] = useState(false);
+  const [lastRun, setLastRun] = useState<Date | null>(null);
+  const [foundCount, setFoundCount] = useState<number>(0);
   const [parseUrl, setParseUrl] = useState("");
   const [parseResult, setParseResult] = useState<any>(null);
   const [projectId, setProjectId] = useState("");
@@ -26,7 +28,9 @@ export default function Motor3DPage() {
     setError(null);
     try {
       const res = await motor3dDiscover({ sitemap_url: sitemapUrl, url_prefix: urlPrefix });
-      setUrls(res.urls);
+      setUrls(res.urls || res.sample_urls || []);
+      setFoundCount(res.count);
+      setLastRun(new Date());
     } catch (e: any) {
       setError(e?.message || "Discover failed");
     } finally {
@@ -104,6 +108,11 @@ export default function Motor3DPage() {
           {discovering ? "Discovering..." : "Discover"}
         </button>
         <p className="text-sm text-slate-300">Found: {urls.length}</p>
+        {lastRun && (
+          <p className="text-xs text-slate-400">
+            Last run: {lastRun.toLocaleString()} · Total reported: {foundCount}
+          </p>
+        )}
         {urls.length > 0 && (
           <div className="max-h-48 overflow-auto rounded-md border border-white/10 bg-slate-900/80 p-2 text-xs text-slate-200">
             {urls.slice(0, 50).map((u) => (
